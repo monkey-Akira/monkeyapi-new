@@ -26,14 +26,11 @@ type BaseNavItem = {
   title: string
   badge?: string
   icon?: React.ElementType
+  external?: boolean
+  configSection?: string
+  configModule?: string
   activeUrls?: (LinkProps['to'] | (string & {}))[]
   configUrls?: (LinkProps['to'] | (string & {}))[]
-  /**
-   * Minimum role required to see this item in the sidebar. When set, the item
-   * is hidden for users whose role is below this threshold (see
-   * `useSidebarView`). Route-level guards still enforce access independently.
-   */
-  requiredRole?: number
 }
 
 /**
