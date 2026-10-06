@@ -2,6 +2,24 @@
 
 DO NOT send optional commentary
 
+## Mandatory Local Branch Policy
+
+- Read ../AGENTS.md and .codex-notes/current-task.md before any work.
+- This directory (new-api-official) is the only development/publication source.
+- main is reserved for pure official code and must only fast-forward from
+  upstream/main. Do not commit custom code or personal CI to main.
+- monkey holds customizations and releases, tracking origin/monkey.
+- Branch feature/* from monkey and merge back into monkey.
+- Official updates flow upstream/main -> main -> monkey, never the reverse.
+- Publish personal GHCR images from monkey only.
+- Verify directory, branch, working tree and remote/ref before modifying,
+  committing, merging or pushing. Stop if the policy does not match.
+- Do not bypass hooks, overwrite directories, reset away customizations or force
+  push without explicit user authorization.
+- Local main is pure official and monkey preserves the customizations.
+- Remote origin/main still needs an explicitly authorized history replacement.
+  Publish customization updates only to origin/monkey.
+
 ## Overview
 
 This is an AI API gateway/proxy built with Go. It aggregates 40+ upstream AI providers (OpenAI, Claude, Gemini, Azure, AWS Bedrock, etc.) behind a unified API, with user management, billing, rate limiting, and an admin dashboard.
