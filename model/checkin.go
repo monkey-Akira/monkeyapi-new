@@ -3,9 +3,13 @@ package model
 import (
 	"errors"
 	"math/rand"
+	"strconv"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/setting/config"
 	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"gorm.io/gorm"
 )
@@ -53,7 +57,11 @@ func HasCheckedInToday(userId int) (bool, error) {
 // MySQL 和 PostgreSQL 使用事务保证原子性
 // SQLite 不支持嵌套事务，使用顺序操作 + 手动回滚
 func UserCheckin(userId int) (*Checkin, error) {
-	setting := operation_setting.GetCheckinSetting()
+	// A consistent snapshot also prevents a concurrent settings save from
+	// mixing old reward bounds with new tier thresholds.
+	common.OptionMapRWMutex.RLock()
+	setting := *operation_setting.GetCheckinSetting()
+	common.OptionMapRWMutex.RUnlock()
 	if !setting.Enabled {
 		return nil, errors.New("签到功能未启用")
 	}
@@ -67,18 +75,50 @@ func UserCheckin(userId int) (*Checkin, error) {
 		return nil, errors.New("今日已签到")
 	}
 
-	// 计算随机额度奖励
-	quotaAwarded := setting.MinQuota
-	if setting.MaxQuota > setting.MinQuota {
-		quotaAwarded = setting.MinQuota + rand.Intn(setting.MaxQuota-setting.MinQuota+1)
+	if err := setting.Validate(); err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	var consumption struct {
+		Requests int64
+		Quota    int64
+	}
+	err = LOG_DB.Model(&Log{}).
+		Where("user_id = ? AND type = ? AND created_at >= ? AND created_at < ?",
+			userId, LogTypeConsume, todayStart.AddDate(0, 0, -1).Unix(), todayStart.Unix()).
+		Select("COUNT(*) AS requests, COALESCE(SUM(quota), 0) AS quota").
+		Scan(&consumption).Error
+	if err != nil {
+		return nil, err
+	}
+	if consumption.Requests < int64(setting.MinPreviousDayRequests) {
+		return nil, errors.New("昨日请求次数不足，未达到签到要求")
+	}
+	if setting.MinSingleRedemptionQuota > 0 {
+		var count int64
+		err = DB.Unscoped().Model(&Redemption{}).
+			Where("used_user_id = ? AND status = ? AND quota >= ?",
+				userId, common.RedemptionCodeStatusUsed, setting.MinSingleRedemptionQuota).
+			Count(&count).Error
+		if err != nil {
+			return nil, err
+		}
+		if count == 0 {
+			return nil, errors.New("未使用过达到最低额度要求的兑换码")
+		}
+	}
+	quotaAwarded, err := setting.Reward(consumption.Quota, rand.Intn)
+	if err != nil {
+		return nil, err
 	}
 
-	today := time.Now().Format("2006-01-02")
+	today := now.Format("2006-01-02")
 	checkin := &Checkin{
 		UserId:       userId,
 		CheckinDate:  today,
 		QuotaAwarded: quotaAwarded,
-		CreatedAt:    time.Now().Unix(),
+		CreatedAt:    now.Unix(),
 	}
 
 	// 根据数据库类型选择不同的策略
@@ -89,6 +129,84 @@ func UserCheckin(userId int) (*Checkin, error) {
 
 	// MySQL 和 PostgreSQL 支持事务，使用事务保证原子性
 	return userCheckinWithTransaction(checkin, userId, quotaAwarded)
+}
+
+var checkinSettingsMutex sync.Mutex
+
+// Save the entire validated configuration in one transaction. Keep the
+// existing dotted option keys so stored settings survive official updates.
+func UpdateCheckinOptions(values map[string]string) error {
+	checkinSettingsMutex.Lock()
+	defer checkinSettingsMutex.Unlock()
+	common.OptionMapRWMutex.RLock()
+	next := *operation_setting.GetCheckinSetting()
+	common.OptionMapRWMutex.RUnlock()
+	for key, value := range values {
+		switch key {
+		case "checkin_setting":
+			if err := common.UnmarshalJsonStr(value, &next); err != nil {
+				return errors.New("签到设置格式无效")
+			}
+		case "checkin_setting.enabled":
+			if value != "true" && value != "false" {
+				return errors.New("签到开关必须为true或false")
+			}
+			next.Enabled = value == "true"
+		default:
+			// Decode each known field strictly; reject fractional numbers and
+			// unknown option keys rather than silently truncating/ignoring them.
+			field := strings.TrimPrefix(key, "checkin_setting.")
+			switch field {
+			case "min_quota", "max_quota", "min_previous_day_requests",
+				"min_single_redemption_quota", "last_10_percent_consume_quota",
+				"twenty_to_ten_percent_consume_quota":
+				number, err := strconv.Atoi(value)
+				if err != nil {
+					return errors.New("签到额度和门槛必须为整数")
+				}
+				if err := common.UnmarshalJsonStr("{\""+field+"\":"+strconv.Itoa(number)+"}", &next); err != nil {
+					return err
+				}
+			default:
+				return errors.New("未知的签到配置项")
+			}
+		}
+	}
+	// Disabling remains possible even when legacy saved settings are invalid.
+	if next.Enabled {
+		if err := next.Validate(); err != nil {
+			return err
+		}
+	}
+	fields, err := config.ConfigToMap(next)
+	if err != nil {
+		return err
+	}
+	if err := DB.Transaction(func(tx *gorm.DB) error {
+		for key, value := range fields {
+			option := Option{Key: "checkin_setting." + key}
+			if err := tx.FirstOrCreate(&option, Option{Key: option.Key}).Error; err != nil {
+				return err
+			}
+			option.Value = value
+			if err := tx.Save(&option).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+	common.OptionMapRWMutex.Lock()
+	defer common.OptionMapRWMutex.Unlock()
+	if common.OptionMap == nil {
+		common.OptionMap = make(map[string]string)
+	}
+	for key, value := range fields {
+		common.OptionMap["checkin_setting."+key] = value
+	}
+	*operation_setting.GetCheckinSetting() = next
+	return nil
 }
 
 // userCheckinWithTransaction 使用事务执行签到（适用于 MySQL 和 PostgreSQL）

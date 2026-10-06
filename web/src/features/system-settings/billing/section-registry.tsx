@@ -197,6 +197,14 @@ const BILLING_SECTIONS = [
           enabled: settings['checkin_setting.enabled'],
           minQuota: settings['checkin_setting.min_quota'],
           maxQuota: settings['checkin_setting.max_quota'],
+          minPreviousDayRequests:
+            settings['checkin_setting.min_previous_day_requests'],
+          minSingleRedemptionQuota:
+            settings['checkin_setting.min_single_redemption_quota'],
+          last10PercentConsumeQuota:
+            settings['checkin_setting.last_10_percent_consume_quota'],
+          twentyToTenPercentConsumeQuota:
+            settings['checkin_setting.twenty_to_ten_percent_consume_quota'],
         }}
       />
     ),

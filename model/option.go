@@ -244,6 +244,9 @@ func validateOptionValue(key string, value string) error {
 }
 
 func UpdateOption(key string, value string) error {
+	if key == "checkin_setting" || strings.HasPrefix(key, "checkin_setting.") {
+		return UpdateCheckinOptions(map[string]string{key: value})
+	}
 	if IsRequestPolicyOption(key) {
 		return UpdateRequestPolicyOptions(map[string]string{key: value})
 	}

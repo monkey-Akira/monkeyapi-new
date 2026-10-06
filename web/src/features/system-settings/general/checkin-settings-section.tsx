@@ -19,8 +19,6 @@ For commercial licensing, please contact support@quantumnous.com
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm, type Resolver } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
-import { toast } from 'sonner'
-import { z } from 'zod'
 
 import {
   Form,
@@ -42,73 +40,45 @@ import {
 import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
-
-const schema = z.object({
-  enabled: z.boolean(),
-  minQuota: z.coerce.number().int().min(0),
-  maxQuota: z.coerce.number().int().min(0),
-})
-
-type Values = z.infer<typeof schema>
+import { createCheckinSchema, type CheckinValues } from './lib/checkin-schema'
 
 export function CheckinSettingsSection({
   defaultValues,
 }: {
-  defaultValues: {
-    enabled: boolean
-    minQuota: number
-    maxQuota: number
-  }
+  defaultValues: CheckinValues
 }) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
 
-  const form = useForm<Values>({
-    resolver: zodResolver(schema) as unknown as Resolver<Values>,
-    defaultValues: {
-      enabled: defaultValues.enabled,
-      minQuota: defaultValues.minQuota,
-      maxQuota: defaultValues.maxQuota,
-    },
+  const form = useForm<CheckinValues>({
+    resolver: zodResolver(createCheckinSchema(t)) as unknown as Resolver<
+      CheckinValues
+    >,
+    defaultValues,
   })
 
   const { isDirty, isSubmitting } = form.formState
   const enabled = form.watch('enabled')
 
-  async function onSubmit(values: Values) {
-    const updates: Array<{ key: string; value: string }> = []
-
-    if (values.enabled !== defaultValues.enabled) {
-      updates.push({
-        key: 'checkin_setting.enabled',
-        value: String(values.enabled),
+  async function onSubmit(values: CheckinValues) {
+    try {
+      await updateOption.mutateAsync({
+        key: 'checkin_setting',
+        value: JSON.stringify({
+          enabled: values.enabled,
+          min_quota: values.minQuota,
+          max_quota: values.maxQuota,
+          min_previous_day_requests: values.minPreviousDayRequests,
+          min_single_redemption_quota: values.minSingleRedemptionQuota,
+          last_10_percent_consume_quota: values.last10PercentConsumeQuota,
+          twenty_to_ten_percent_consume_quota:
+            values.twentyToTenPercentConsumeQuota,
+        }),
       })
+      form.reset(values)
+    } catch {
+      // The shared mutation displays the server error; keep edits for retry.
     }
-
-    if (values.minQuota !== defaultValues.minQuota) {
-      updates.push({
-        key: 'checkin_setting.min_quota',
-        value: String(values.minQuota),
-      })
-    }
-
-    if (values.maxQuota !== defaultValues.maxQuota) {
-      updates.push({
-        key: 'checkin_setting.max_quota',
-        value: String(values.maxQuota),
-      })
-    }
-
-    if (updates.length === 0) {
-      toast.info(t('No changes to save'))
-      return
-    }
-
-    for (const update of updates) {
-      await updateOption.mutateAsync(update)
-    }
-
-    form.reset(values)
   }
 
   return (
@@ -121,6 +91,11 @@ export function CheckinSettingsSection({
             isSaveDisabled={!isDirty}
             saveLabel='Save check-in settings'
           />
+          <p className='text-muted-foreground text-sm'>
+            {t(
+              'Check-in uses raw quota units, not currency. Yesterday consumption must reach 10. Consumption from 10 to below 20 awards 5; from 20 through 50 awards 5-7. These rules bypass the ordinary 15% cap.'
+            )}
+          </p>
           <FormField
             control={form.control}
             name='enabled'
@@ -156,13 +131,16 @@ export function CheckinSettingsSection({
                     <FormControl>
                       <Input
                         type='number'
-                        min={0}
-                        placeholder={t('1000')}
+                        min={1}
+                        max={5}
+                        disabled={isSubmitting}
                         {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Minimum quota amount awarded for check-in')}
+                      {t(
+                        'Ordinary minimum reward (1-5). Low-consumption rewards remain 5 or 5-7.'
+                      )}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -178,8 +156,9 @@ export function CheckinSettingsSection({
                     <FormControl>
                       <Input
                         type='number'
-                        min={0}
-                        placeholder={t('10000')}
+                        min={7}
+                        max={2147483647}
+                        disabled={isSubmitting}
                         {...field}
                       />
                     </FormControl>
@@ -190,6 +169,64 @@ export function CheckinSettingsSection({
                   </FormItem>
                 )}
               />
+              {([
+                {
+                  name: 'last10PercentConsumeQuota',
+                  label: t('First-tier consumption threshold'),
+                  description: t(
+                    'Yesterday consumption needed for 90%-100% rewards, still subject to the 15% cap. This tier skips the jackpot lottery.'
+                  ),
+                },
+                {
+                  name: 'twentyToTenPercentConsumeQuota',
+                  label: t('Second-tier consumption threshold'),
+                  description: t(
+                    'Yesterday consumption needed for 80%-below-90% rewards. Set 0 to disable. The 1% jackpot is checked first when eligible.'
+                  ),
+                },
+                {
+                  name: 'minPreviousDayRequests',
+                  label: t('Minimum previous-day requests'),
+                  description: t(
+                    'Minimum number of consumption logs yesterday. Set 0 to disable this requirement.'
+                  ),
+                },
+                {
+                  name: 'minSingleRedemptionQuota',
+                  label: t('Minimum single redemption quota'),
+                  description: t(
+                    'At least one previously used redemption code must reach this quota. Multiple codes are not added together. Set 0 to disable.'
+                  ),
+                },
+              ] as const).map((item) => (
+                <FormField
+                  key={item.name}
+                  control={form.control}
+                  name={item.name}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{item.label}</FormLabel>
+                      <FormControl>
+                        <Input
+                          type='number'
+                          min={0}
+                          max={2147483647}
+                          step={1}
+                          disabled={isSubmitting}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>{item.description}</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ))}
+              <p className='text-muted-foreground text-sm sm:col-span-2'>
+                {t(
+                  'After consumption reaches four times the maximum reward, the jackpot chance is 1% and awards 90%-100% of the maximum. The jackpot bypasses the ordinary 15% cap. Consumption logs must be enabled and retained.'
+                )}
+              </p>
             </div>
           )}
         </SettingsForm>
