@@ -6,19 +6,22 @@ DO NOT send optional commentary
 
 - Read ../AGENTS.md and .codex-notes/current-task.md before any work.
 - This directory (new-api-official) is the only development/publication source.
-- main is reserved for pure official code and must only fast-forward from
-  upstream/main. Do not commit custom code or personal CI to main.
-- monkey holds customizations and releases, tracking origin/monkey.
+- Local official contains pure official code, tracks upstream/main, and only
+  fast-forwards from fetched upstream/main. Do not commit custom code there.
+- Local monkey holds customizations and releases, tracking origin/main.
 - Branch feature/* from monkey and merge back into monkey.
-- Official updates flow upstream/main -> main -> monkey, never the reverse.
-- Publish personal GHCR images from monkey only.
+- Update flow: upstream/main -> official -> monkey -> origin/main.
+- Merge official into monkey, resolve conflicts and verify before publishing.
+- Personal GitHub main is the customized deployment branch. Publish with
+  git push origin monkey:main; do not merge customizations into official.
+- Keep feature and backup branches local unless publication is explicitly requested.
+- Personal GHCR images publish from remote main; servers continue pulling main.
 - Verify directory, branch, working tree and remote/ref before modifying,
   committing, merging or pushing. Stop if the policy does not match.
 - Do not bypass hooks, overwrite directories, reset away customizations or force
   push without explicit user authorization.
-- Local main is pure official and monkey preserves the customizations.
-- Remote origin/main still needs an explicitly authorized history replacement.
-  Publish customization updates only to origin/monkey.
+- The former policy of pure official main and origin/monkey publishing is
+  superseded by the user-confirmed workflow above.
 
 ## Overview
 

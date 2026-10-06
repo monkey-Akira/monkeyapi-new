@@ -1,9 +1,9 @@
-name: Publish Docker image (monkey)
+name: Publish Docker image (main)
 
 on:
   push:
     branches:
-      - monkey
+      - main
   workflow_dispatch:
 
 permissions:
@@ -11,13 +11,13 @@ permissions:
   packages: write
 
 concurrency:
-  group: docker-image-monkey-${{ github.ref }}
+  group: docker-image-main-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build-and-push:
     name: Build and push GHCR image
-    if: github.ref == 'refs/heads/monkey'
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 45
 
@@ -32,7 +32,7 @@ jobs:
         shell: bash
         run: |
           IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}"
-          VERSION="monkey-$(date -u +'%Y%m%d')-${GITHUB_SHA::7}"
+          VERSION="main-$(date -u +'%Y%m%d')-${GITHUB_SHA::7}"
           echo "$VERSION" > VERSION
           echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
