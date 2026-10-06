@@ -16,11 +16,18 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { LayoutDashboard } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
-
+import { useAuthStore } from '@/stores/auth-store'
+import { api } from '@/lib/api'
+import {
+  getSidebarVisibilityMap,
+  parseSidebarModulesAdmin,
+  type SidebarVisibilityConfig,
+} from '@/lib/navigation-config'
+import { useStatus } from '@/hooks/use-status'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -29,132 +36,94 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import { IconBadge } from '@/components/ui/icon-badge'
 import { Switch } from '@/components/ui/switch'
-import { api } from '@/lib/api'
-import { handleServerError } from '@/lib/handle-server-error'
-import { useAuthStore } from '@/stores/auth-store'
-
-type SidebarModuleConfig = {
-  enabled: boolean
-  [key: string]: boolean
-}
-
-type SidebarModulesConfig = Record<string, SidebarModuleConfig>
 
 type SectionDef = {
   key: string
   title: string
-  description: string
-  modules: { key: string; title: string; description: string }[]
+  modules: { key: string; title: string }[]
+}
+
+function cloneVisibility(config: SidebarVisibilityConfig): SidebarVisibilityConfig {
+  return Object.entries(config).reduce<SidebarVisibilityConfig>(
+    (acc, [section, sectionConfig]) => {
+      acc[section] = { ...sectionConfig }
+      return acc
+    },
+    {}
+  )
 }
 
 export function SidebarModulesCard() {
   const { t } = useTranslation()
+  const { status } = useStatus()
   const [loading, setLoading] = useState(false)
-  const [config, setConfig] = useState<SidebarModulesConfig>({})
+  const [config, setConfig] = useState<SidebarVisibilityConfig>({})
   const currentUser = useAuthStore((s) => s.auth.user)
   const setUser = useAuthStore((s) => s.auth.setUser)
 
-  const sectionDefs: SectionDef[] = [
-    {
-      key: 'chat',
-      title: t('Chat Area'),
-      description: t('Playground and chat functions'),
-      modules: [
-        {
-          key: 'playground',
-          title: t('Playground'),
-          description: t('AI model testing environment'),
-        },
-        {
-          key: 'chat',
-          title: t('Chat'),
-          description: t('Chat session management'),
-        },
-      ],
-    },
-    {
-      key: 'console',
-      title: t('Console Area'),
-      description: t('Data management and log viewing'),
-      modules: [
-        {
-          key: 'detail',
-          title: t('Dashboard'),
-          description: t('System data statistics'),
-        },
-        {
-          key: 'token',
-          title: t('Token Management'),
-          description: t('API token management'),
-        },
-        {
-          key: 'log',
-          title: t('Usage Logs'),
-          description: t('API usage records'),
-        },
-        {
-          key: 'audit',
-          title: t('Audit Logs'),
-          description: t('Login, security and access records'),
-        },
-        {
-          key: 'midjourney',
-          title: t('Drawing Logs'),
-          description: t('Drawing task records'),
-        },
-        {
-          key: 'task',
-          title: t('Task Logs'),
-          description: t('System task records'),
-        },
-      ],
-    },
-    {
-      key: 'personal',
-      title: t('Personal Center Area'),
-      description: t('User personal functions'),
-      modules: [
-        {
-          key: 'topup',
-          title: t('Wallet Management'),
-          description: t('Balance and top-up management'),
-        },
-        {
-          key: 'personal',
-          title: t('Personal Settings'),
-          description: t('Personal info settings'),
-        },
-        {
-          key: 'security',
-          title: t('Security & Access'),
-          description: t('Manage your security settings and account access'),
-        },
-      ],
-    },
-  ]
+  const adminConfig = useMemo(
+    () => parseSidebarModulesAdmin(status?.SidebarModulesAdmin),
+    [status?.SidebarModulesAdmin]
+  )
+
+  const adminVisibility = useMemo(
+    () => getSidebarVisibilityMap(adminConfig),
+    [adminConfig]
+  )
+
+  const sectionDefs: SectionDef[] = useMemo(
+    () =>
+      adminConfig.sections
+        .filter((section) => section.id !== 'admin' && section.enabled)
+        .map((section) => ({
+          key: section.id,
+          title: t(section.label),
+          modules: section.items
+            .filter((item) => item.enabled)
+            .map((item) => ({
+              key: item.id,
+              title: t(item.label),
+            })),
+        }))
+        .filter((section) => section.modules.length > 0),
+    [adminConfig, t]
+  )
+
+  const buildDefaultConfig = useCallback(() => {
+    const defaults: SidebarVisibilityConfig = {}
+    for (const section of sectionDefs) {
+      defaults[section.key] = { enabled: true }
+      for (const mod of section.modules) defaults[section.key][mod.key] = true
+    }
+    return defaults
+  }, [sectionDefs])
 
   const loadConfig = useCallback(async () => {
     try {
       const res = await api.get('/api/user/self')
       if (res.data.success && res.data.data?.sidebar_modules) {
         const raw = res.data.data.sidebar_modules
-        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
-        setConfig(parsed)
-      } else {
-        const defaults: SidebarModulesConfig = {}
-        for (const sec of sectionDefs) {
-          defaults[sec.key] = { enabled: true }
-          for (const mod of sec.modules) defaults[sec.key][mod.key] = true
+        const parsed =
+          typeof raw === 'string' ? JSON.parse(raw) : (raw as unknown)
+        if (
+          parsed &&
+          typeof parsed === 'object' &&
+          Array.isArray((parsed as Record<string, unknown>).sections)
+        ) {
+          setConfig(
+            getSidebarVisibilityMap(parseSidebarModulesAdmin(parsed))
+          )
+          return
         }
-        setConfig(defaults)
+        setConfig(parsed as SidebarVisibilityConfig)
+        return
       }
+      setConfig(buildDefaultConfig())
     } catch {
-      /* ignore */
+      setConfig(buildDefaultConfig())
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [buildDefaultConfig])
 
   useEffect(() => {
     loadConfig()
@@ -181,44 +150,53 @@ export function SidebarModulesCard() {
   const handleSave = async () => {
     setLoading(true)
     try {
-      const serialized = JSON.stringify(config)
+      const next = cloneVisibility(config)
+      Object.entries(adminVisibility).forEach(([sectionKey, section]) => {
+        if (section.enabled === false) {
+          next[sectionKey] = { ...next[sectionKey], enabled: false }
+          return
+        }
+        Object.entries(section).forEach(([moduleKey, enabled]) => {
+          if (moduleKey !== 'enabled' && enabled === false) {
+            next[sectionKey] = {
+              ...next[sectionKey],
+              [moduleKey]: false,
+            }
+          }
+        })
+      })
+
+      const serialized = JSON.stringify(next)
       const res = await api.put('/api/user/self', {
         sidebar_modules: serialized,
       })
       if (res.data.success) {
-        // Sync to auth-store so useSidebarConfig re-runs and the sidebar
-        // updates immediately without needing a page refresh.
         if (currentUser) {
           setUser({ ...currentUser, sidebar_modules: serialized })
         }
         toast.success(t('Saved successfully'))
       } else {
-        handleServerError(res.data, t('Save failed'))
+        toast.error(res.data.message || t('Save failed'))
       }
-    } catch (error) {
-      handleServerError(error, t('Save failed, please retry'))
+    } catch {
+      toast.error(t('Save failed, please retry'))
     } finally {
       setLoading(false)
     }
   }
 
   const handleReset = () => {
-    const defaults: SidebarModulesConfig = {}
-    for (const sec of sectionDefs) {
-      defaults[sec.key] = { enabled: true }
-      for (const mod of sec.modules) defaults[sec.key][mod.key] = true
-    }
-    setConfig(defaults)
+    setConfig(buildDefaultConfig())
     toast.success(t('Reset to default configuration'))
   }
 
   return (
-    <Card data-card-hover='false' className='gap-0 overflow-hidden py-0'>
+    <Card className='gap-0 overflow-hidden py-0'>
       <CardHeader className='border-b p-3 !pb-3 sm:p-5 sm:!pb-5'>
         <div className='flex items-center gap-3'>
-          <IconBadge tone='info' size='title'>
-            <LayoutDashboard />
-          </IconBadge>
+          <div className='bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-lg sm:h-9 sm:w-9'>
+            <LayoutDashboard className='h-4 w-4' />
+          </div>
           <div className='min-w-0'>
             <CardTitle className='text-lg tracking-tight sm:text-xl'>
               {t('Sidebar Personal Settings')}
@@ -240,9 +218,6 @@ export function SidebarModulesCard() {
               <div className='flex items-start justify-between gap-3'>
                 <div className='min-w-0'>
                   <p className='text-sm font-medium'>{section.title}</p>
-                  <p className='text-muted-foreground text-xs'>
-                    {section.description}
-                  </p>
                 </div>
                 <Switch
                   checked={sectionEnabled}
@@ -253,18 +228,13 @@ export function SidebarModulesCard() {
                 {section.modules.map((mod) => (
                   <div
                     key={mod.key}
-                    className={`flex min-h-16 items-center justify-between rounded-lg border p-3 ${
+                    className={`flex min-h-12 items-center justify-between rounded-lg border p-3 transition-opacity ${
                       sectionEnabled ? '' : 'opacity-50'
                     }`}
                   >
-                    <div className='mr-2 min-w-0'>
-                      <p className='truncate text-sm font-medium'>
-                        {mod.title}
-                      </p>
-                      <p className='text-muted-foreground truncate text-xs'>
-                        {mod.description}
-                      </p>
-                    </div>
+                    <p className='mr-2 truncate text-sm font-medium'>
+                      {mod.title}
+                    </p>
                     <Switch
                       checked={config[section.key]?.[mod.key] !== false}
                       onCheckedChange={(v) =>
