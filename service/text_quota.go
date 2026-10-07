@@ -431,6 +431,13 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		}
 	}
 
+	emptyResponseRefundMode := getEmptyResponseRefundMode(ctx, relayInfo, originUsage)
+	plannedQuota := summary.Quota
+	if emptyResponseRefundMode == operation_setting.EmptyResponseRefundModeObserve {
+		extraContent = append(extraContent, "空响应自动退款观察模式命中，本次未退款")
+	} else if emptyResponseRefundMode == operation_setting.EmptyResponseRefundModeRefund {
+		summary.Quota = 0
+	}
 	for _, item := range summary.ToolSurchargeItems {
 		q := decimal.NewFromFloat(item.Price).
 			Mul(decimal.NewFromInt(int64(item.Count))).
@@ -449,7 +456,9 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		extraContent = append(extraContent, fmt.Sprintf("Audio Input 花费 %s", logger.LogQuota(common.QuotaFromDecimal(q))))
 	}
 
-	if !summary.hasBillableUsage() {
+	if emptyResponseRefundMode == operation_setting.EmptyResponseRefundModeRefund {
+		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, 0)
+	} else if !summary.hasBillableUsage() {
 		extraContent = append(extraContent, "上游没有返回计费信息，无法扣费（可能是上游超时）")
 		logger.LogError(ctx, fmt.Sprintf("total tokens is 0, cannot consume quota, userId %d, channelId %d, tokenId %d, model %s， pre-consumed quota %d", relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, summary.ModelName, relayInfo.FinalPreConsumedQuota))
 	} else {
@@ -457,7 +466,9 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		model.UpdateChannelUsedQuota(relayInfo.ChannelId, summary.Quota)
 	}
 
+	settlementSucceeded := true
 	if err := SettleBilling(ctx, relayInfo, summary.Quota); err != nil {
+		settlementSucceeded = false
 		logger.LogError(ctx, "error settling billing: "+err.Error())
 	}
 
@@ -488,6 +499,11 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	appendUsageBillingPathForLog(other, common.GetContextKeyBool(ctx, constant.ContextKeyLocalCountTokens), originUsage)
 	if adminRejectReason != "" {
 		other.SetAdmin("reject_reason", adminRejectReason)
+	}
+	if emptyResponseRefundMode != operation_setting.EmptyResponseRefundModeOff {
+		other.SetPublic("empty_response_detected", true)
+		other.SetPublic("empty_response_refund_mode", emptyResponseRefundMode)
+		other.SetPublic("empty_response_planned_quota", plannedQuota)
 	}
 	if summary.ImageTokens != 0 {
 		other.SetPublic("image", true)
@@ -547,5 +563,26 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		Group:            relayInfo.UsingGroup,
 		Other:            other,
 	})
+	if emptyResponseRefundMode == operation_setting.EmptyResponseRefundModeRefund && settlementSucceeded {
+		refundOther := model.NewLogOther()
+		refundOther.SetPublic("reason", "空响应自动退款：模型未产生输出 Token，本次费用已全部退回。")
+		refundOther.SetPublic("empty_response_refund", true)
+		refundOther.SetPublic("empty_response_planned_quota", plannedQuota)
+		refundOther.SetAdmin("billing_source", relayInfo.BillingSource)
+		model.RecordRefundLog(ctx, relayInfo.UserId, model.RecordRefundLogParams{
+			ChannelId:        relayInfo.ChannelId,
+			PromptTokens:     summary.PromptTokens,
+			CompletionTokens: summary.CompletionTokens,
+			ModelName:        logModel,
+			TokenName:        summary.TokenName,
+			Quota:            plannedQuota,
+			Content:          "空响应自动退款：模型未产生输出 Token，本次费用已全部退回。",
+			TokenId:          relayInfo.TokenId,
+			UseTimeSeconds:   int(summary.UseTimeSeconds),
+			IsStream:         relayInfo.IsStream,
+			Group:            relayInfo.UsingGroup,
+			Other:            refundOther,
+		})
+	}
 	relayInfo.PerformanceOutputTokens = int64(summary.CompletionTokens)
 }

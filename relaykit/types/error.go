@@ -88,14 +88,16 @@ const (
 )
 
 type NewAPIError struct {
-	Err            error
-	RelayError     any
-	skipRetry      bool
-	recordErrorLog *bool
-	errorType      ErrorType
-	errorCode      ErrorCode
-	StatusCode     int
-	Metadata       json.RawMessage
+	Err              error
+	RelayError       any
+	skipRetry        bool
+	recordErrorLog   *bool
+	upstreamError    bool
+	errorMessageCode string
+	errorType        ErrorType
+	errorCode        ErrorCode
+	StatusCode       int
+	Metadata         json.RawMessage
 }
 
 // Unwrap enables errors.Is / errors.As to work with NewAPIError by exposing the underlying error.
@@ -113,6 +115,53 @@ func (e *NewAPIError) GetErrorCode() ErrorCode {
 	return e.errorCode
 }
 
+func (e *NewAPIError) GetErrorMessageCode() string {
+
+	if e == nil {
+
+		return ""
+
+	}
+
+	if code := strings.TrimSpace(e.errorMessageCode); code != "" {
+
+		return code
+
+	}
+
+	if e.upstreamError && e.StatusCode > 0 &&
+
+		(e.errorCode == ErrorCodeBadResponseStatusCode || e.errorCode == ErrorCode("unknown_error")) {
+
+		return fmt.Sprintf("http_%d", e.StatusCode)
+
+	}
+
+	return strings.TrimSpace(string(e.errorCode))
+}
+
+func (e *NewAPIError) SetErrorMessageCode(code string) {
+
+	if e != nil {
+
+		e.errorMessageCode = strings.TrimSpace(code)
+
+	}
+}
+
+func (e *NewAPIError) IsUpstreamError() bool {
+
+	return e != nil && e.upstreamError
+}
+
+func (e *NewAPIError) MarkAsUpstreamError() {
+
+	if e != nil {
+
+		e.upstreamError = true
+
+	}
+}
 func (e *NewAPIError) GetErrorType() ErrorType {
 	if e == nil {
 		return ""
@@ -396,6 +445,14 @@ func ErrOptionWithStatusCode(statusCode int) NewAPIErrorOptions {
 	}
 }
 
+func ErrOptionWithUpstreamError() NewAPIErrorOptions {
+
+	return func(e *NewAPIError) {
+
+		e.upstreamError = true
+
+	}
+}
 func ErrOptionWithHideErrMsg(replaceStr string) NewAPIErrorOptions {
 	return func(e *NewAPIError) {
 		if kitutil.Debug.Load() {

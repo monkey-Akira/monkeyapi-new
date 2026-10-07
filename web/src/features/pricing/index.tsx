@@ -33,8 +33,15 @@ import {
   ModelDetailsDrawer,
 } from './components'
 import { EXCLUDED_GROUPS, VIEW_MODES } from './constants'
-import { useFilters } from './hooks/use-filters'
+import {
+  RECHARGE_PRICE_MODE,
+  STANDARD_PRICE_MODE,
+  useFilters,
+} from './hooks/use-filters'
 import { usePricingData } from './hooks/use-pricing-data'
+import type { PriceDisplayOption } from './types'
+
+const PRICING_RATIO_QUOTA_BASE = 500000
 
 export function Pricing() {
   const { t } = useTranslation()
@@ -52,6 +59,7 @@ export function Pricing() {
     isLoading,
     priceRate,
     usdExchangeRate,
+    pricingDisplayRatios,
   } = usePricingData()
 
   const {
@@ -64,7 +72,7 @@ export function Pricing() {
     tagFilter,
     tokenUnit,
     viewMode,
-    showRechargePrice,
+    priceDisplayMode,
     setSearchInput,
     setSortBy,
     setVendorFilter,
@@ -74,7 +82,7 @@ export function Pricing() {
     setTagFilter,
     setTokenUnit,
     setViewMode,
-    setShowRechargePrice,
+    setPriceDisplayMode,
     filteredModels,
     hasActiveFilters,
     activeFilterCount,
@@ -86,6 +94,33 @@ export function Pricing() {
   const handleModelClick = useCallback((modelName: string) => {
     setSelectedModelName(modelName)
   }, [])
+
+  const priceDisplayOptions = useMemo<PriceDisplayOption[]>(() => {
+    const ratioOptions = pricingDisplayRatios.map((ratio) => ({
+      value: `ratio:${ratio}`,
+      label: String(ratio),
+      priceRate: (usdExchangeRate * PRICING_RATIO_QUOTA_BASE) / ratio,
+    }))
+
+    return [
+      { value: STANDARD_PRICE_MODE, label: t('Standard') },
+      {
+        value: RECHARGE_PRICE_MODE,
+        label: t('Recharge'),
+        priceRate,
+      },
+      ...ratioOptions,
+    ]
+  }, [priceRate, pricingDisplayRatios, t, usdExchangeRate])
+
+  const activePriceDisplay = useMemo(
+    () =>
+      priceDisplayOptions.find((option) => option.value === priceDisplayMode) ??
+      priceDisplayOptions[0],
+    [priceDisplayMode, priceDisplayOptions]
+  )
+  const activePriceRate = activePriceDisplay.priceRate ?? priceRate
+  const showAdjustedPrice = activePriceDisplay.value !== STANDARD_PRICE_MODE
 
   const selectedModel = useMemo(
     () =>
@@ -126,10 +161,10 @@ export function Pricing() {
         <ModelCardGrid
           models={filteredModels}
           onModelClick={handleModelClick}
-          priceRate={priceRate}
+          priceRate={activePriceRate}
           usdExchangeRate={usdExchangeRate}
           tokenUnit={tokenUnit}
-          showRechargePrice={showRechargePrice}
+          showRechargePrice={showAdjustedPrice}
           selectedGroup={groupFilter}
         />
       )
@@ -138,10 +173,10 @@ export function Pricing() {
     return (
       <PricingTable
         models={filteredModels}
-        priceRate={priceRate}
+        priceRate={activePriceRate}
         usdExchangeRate={usdExchangeRate}
         tokenUnit={tokenUnit}
-        showRechargePrice={showRechargePrice}
+        showRechargePrice={showAdjustedPrice}
         selectedGroup={groupFilter}
         onModelClick={handleModelClick}
       />
@@ -232,8 +267,9 @@ export function Pricing() {
                 onSortChange={setSortBy}
                 tokenUnit={tokenUnit}
                 onTokenUnitChange={setTokenUnit}
-                showRechargePrice={showRechargePrice}
-                onRechargePriceChange={setShowRechargePrice}
+                priceDisplayMode={activePriceDisplay.value}
+                priceDisplayOptions={priceDisplayOptions}
+                onPriceDisplayModeChange={setPriceDisplayMode}
                 viewMode={viewMode}
                 onViewModeChange={setViewMode}
                 quotaTypeFilter={quotaTypeFilter}
@@ -276,10 +312,10 @@ export function Pricing() {
                 >) || {}
               }
               autoGroups={autoGroups || []}
-              priceRate={priceRate ?? 1}
+              priceRate={activePriceRate ?? 1}
               usdExchangeRate={usdExchangeRate ?? 1}
               tokenUnit={tokenUnit}
-              showRechargePrice={showRechargePrice}
+              showRechargePrice={showAdjustedPrice}
             />
           )}
         </PageTransition>

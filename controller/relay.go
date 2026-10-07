@@ -80,7 +80,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		var err error
 		ws, err = upgrader.Upgrade(c.Writer, c.Request, nil)
 		if err != nil {
-			helper.WssError(c, ws, types.NewError(err, types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry()).ToOpenAIError())
+			helper.WssError(c, ws, common.ToOpenAIErrorWithCustomMessage(types.NewError(err, types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())))
 			return
 		}
 		defer ws.Close()
@@ -93,15 +93,15 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			newAPIError.SetMessage(common.MessageWithRequestId(newAPIError.Error(), requestId))
 			switch relayFormat {
 			case types.RelayFormatOpenAIRealtime:
-				helper.WssError(c, ws, newAPIError.ToOpenAIError())
+				helper.WssError(c, ws, common.ToOpenAIErrorWithCustomMessage(newAPIError))
 			case types.RelayFormatClaude:
 				c.JSON(newAPIError.StatusCode, gin.H{
 					"type":  "error",
-					"error": newAPIError.ToClaudeError(),
+					"error": common.ToClaudeErrorWithCustomMessage(newAPIError),
 				})
 			default:
 				c.JSON(newAPIError.StatusCode, gin.H{
-					"error": newAPIError.ToOpenAIError(),
+					"error": common.ToOpenAIErrorWithCustomMessage(newAPIError),
 				})
 			}
 		}

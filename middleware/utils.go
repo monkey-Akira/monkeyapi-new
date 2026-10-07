@@ -16,6 +16,7 @@ func abortWithOpenAiMessage(c *gin.Context, statusCode int, message string, code
 	if len(code) > 0 {
 		codeStr = string(code[0])
 	}
+	message = common.ApplyCustomErrorMessage(codeStr, message)
 	userId := c.GetInt("id")
 	_, preparedPluginRoute := c.Get(pluginruntime.ContextKeyRouteRequest)
 	if !preparedPluginRoute || !RespondTaskPluginError(c, &dto.TaskError{

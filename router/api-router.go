@@ -207,6 +207,7 @@ func SetApiRouter(router *gin.Engine) {
 			optionRoute.GET("/request_policy", controller.GetRequestPolicy)
 			optionRoute.PATCH("/request_policy", controller.UpdateRequestPolicy)
 			optionRoute.PUT("/", controller.UpdateOption)
+			optionRoute.PUT("/empty_response_refund_setting", controller.UpdateEmptyResponseRefundSetting)
 			optionRoute.PUT("/passkey/domains", controller.UpdatePasskeyDomains)
 			optionRoute.GET("/model_pricing", controller.GetModelPricingConfig)
 			optionRoute.PATCH("/model_pricing", controller.UpdateModelPricingConfig)

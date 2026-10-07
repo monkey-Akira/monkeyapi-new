@@ -46,7 +46,12 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { cn } from '@/lib/utils'
 
 import { getSortLabels, type SortOption, type ViewMode } from '../constants'
-import type { PricingModel, PricingVendor, TokenUnit } from '../types'
+import type {
+  PricingModel,
+  PricingVendor,
+  PriceDisplayOption,
+  TokenUnit,
+} from '../types'
 import { PricingSidebar } from './pricing-sidebar'
 
 export interface PricingToolbarProps {
@@ -56,8 +61,11 @@ export interface PricingToolbarProps {
   onSortChange: (value: string) => void
   tokenUnit: TokenUnit
   onTokenUnitChange: (value: TokenUnit) => void
-  showRechargePrice: boolean
-  onRechargePriceChange: (value: boolean) => void
+  priceDisplayMode?: string
+  priceDisplayOptions?: PriceDisplayOption[]
+  onPriceDisplayModeChange?: (value: string) => void
+  showRechargePrice?: boolean
+  onRechargePriceChange?: (value: boolean) => void
   viewMode: ViewMode
   onViewModeChange: (value: ViewMode) => void
   quotaTypeFilter: string
@@ -84,6 +92,20 @@ export function PricingToolbar(props: PricingToolbarProps) {
   const { t } = useTranslation()
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
   const sortLabels = getSortLabels(t)
+  const priceDisplayOptions = props.priceDisplayOptions ?? [
+    { value: 'standard', label: t('Standard') },
+    { value: 'recharge', label: t('Recharge') },
+  ]
+  const priceDisplayMode =
+    props.priceDisplayMode ??
+    (props.showRechargePrice ? 'recharge' : 'standard')
+  const handlePriceDisplayModeChange = (value: string) => {
+    if (props.onPriceDisplayModeChange) {
+      props.onPriceDisplayModeChange(value)
+    } else {
+      props.onRechargePriceChange?.(value === 'recharge')
+    }
+  }
 
   return (
     <div className='bg-card rounded-xl border p-3'>
@@ -121,18 +143,21 @@ export function PricingToolbar(props: PricingToolbarProps) {
 
         <div className='flex min-w-0 flex-wrap items-center gap-2'>
           <ToggleGroup
-            value={[props.showRechargePrice ? 'recharge' : 'standard']}
+            value={[priceDisplayMode]}
             onValueChange={(values) => {
               if (values.length > 0) {
-                props.onRechargePriceChange(values[0] === 'recharge')
+                handlePriceDisplayModeChange(values[0])
               }
             }}
             variant='outline'
             size='sm'
             aria-label={t('Price display mode')}
           >
-            <ToggleGroupItem value='standard'>{t('Standard')}</ToggleGroupItem>
-            <ToggleGroupItem value='recharge'>{t('Recharge')}</ToggleGroupItem>
+            {priceDisplayOptions.map((option) => (
+              <ToggleGroupItem key={option.value} value={option.value}>
+                {option.label}
+              </ToggleGroupItem>
+            ))}
           </ToggleGroup>
           <ToggleGroup
             value={[props.tokenUnit]}

@@ -62,6 +62,10 @@ import { cn } from '@/lib/utils'
 import { useSystemConfigStore } from '@/stores/system-config-store'
 
 import { DEFAULT_TOKEN_UNIT } from '../constants'
+import {
+  RECHARGE_PRICE_MODE,
+  STANDARD_PRICE_MODE,
+} from '../hooks/use-filters'
 import { useBillingTime } from '../hooks/use-billing-time'
 import { usePricingData } from '../hooks/use-pricing-data'
 import type { ParsedTaskTier } from '../lib/billing-expr'
@@ -116,6 +120,8 @@ function SectionTitle(props: { children: React.ReactNode }) {
     </h2>
   )
 }
+
+const PRICING_RATIO_QUOTA_BASE = 500000
 
 function DynamicPriceEntryLabel(props: { entry: DynamicPriceEntry }) {
   const { t, i18n } = useTranslation()
@@ -1610,10 +1616,26 @@ export function ModelDetails() {
     isLoading,
     priceRate,
     usdExchangeRate,
+    pricingDisplayRatios,
   } = usePricingData()
 
   const tokenUnit: TokenUnit =
     search.tokenUnit === 'K' ? 'K' : DEFAULT_TOKEN_UNIT
+  const priceDisplayMode =
+    search.priceMode ||
+    (search.rechargePrice ? RECHARGE_PRICE_MODE : STANDARD_PRICE_MODE)
+  const ratioModeValue = priceDisplayMode.startsWith('ratio:')
+    ? Number(priceDisplayMode.slice('ratio:'.length))
+    : NaN
+  const activeRatio = pricingDisplayRatios.includes(ratioModeValue)
+    ? ratioModeValue
+    : null
+  const activePriceRate =
+    activeRatio != null
+      ? (usdExchangeRate * PRICING_RATIO_QUOTA_BASE) / activeRatio
+      : priceRate
+  const showAdjustedPrice =
+    activeRatio != null || priceDisplayMode === RECHARGE_PRICE_MODE
 
   const model = useMemo(() => {
     if (!models || !modelId) return null
@@ -1685,10 +1707,10 @@ export function ModelDetails() {
           groupRatio={groupRatio || {}}
           usableGroup={usableGroup || {}}
           autoGroups={autoGroups || []}
-          priceRate={priceRate ?? 1}
+          priceRate={activePriceRate ?? 1}
           usdExchangeRate={usdExchangeRate ?? 1}
           tokenUnit={tokenUnit}
-          showRechargePrice={search.rechargePrice ?? false}
+          showRechargePrice={showAdjustedPrice}
           endpointMap={
             (endpointMap as Record<
               string,

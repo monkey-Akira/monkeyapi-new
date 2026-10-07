@@ -261,6 +261,9 @@ export interface LogOtherData {
   result_discarded?: boolean
   task_id?: string
   reason?: string
+  empty_response_refund?: boolean
+  empty_response_refund_mode?: 'observe' | 'refund' | string
+  empty_response_planned_quota?: number
   // Subscription billing fields
   subscription_plan_id?: string
   subscription_plan_title?: string

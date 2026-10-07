@@ -4459,6 +4459,8 @@
     "Price (local currency / USD)": "Prix (devise locale / USD)",
     "Price display": "Affichage des prix",
     "Price display mode": "Mode d'affichage des prix",
+    "Pricing display ratios": "Ratios d'affichage des prix",
+    "JSON array of ratios shown in the model square price switcher": "Tableau JSON des ratios affichés dans le sélecteur de prix de la place des modèles",
     "Price estimation": "Estimation du prix",
     "Price estimation description": "Après avoir configuré le type de matériel, l'emplacement de déploiement, le nombre de réplicas, etc., le prix sera calculé automatiquement.",
     "Price examples": "Exemples de prix",
@@ -6777,6 +6779,18 @@
     "Zhipu": "Zhipu",
     "Zhipu GLM": "Zhipu GLM",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Error Response Messages": "Messages de réponse d erreur",
+    "Enable custom error messages": "Activer les messages d erreur personnalisés",
+    "Replace only the returned error.message by error code. Logs and error codes are kept unchanged.": "Remplace uniquement error.message selon le code. Les journaux et les codes restent inchangés.",
+    "Error code": "Code erreur",
+    "Returned message": "Message renvoyé",
+    "Message returned to users": "Message renvoyé aux utilisateurs",
+    "Error codes must be unique": "Les codes erreur doivent être uniques",
+    "Message cannot be empty": "Le message ne peut pas être vide",
+    "No custom error messages configured.": "Aucun message erreur personnalisé configuré.",
+    "Add mapping": "Ajouter une correspondance",
+    "Use default mappings": "Utiliser les correspondances par défaut",
+    "Save error messages": "Enregistrer les messages erreur"
   }
 }

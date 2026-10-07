@@ -872,10 +872,17 @@ export function DetailsDialog(props: DetailsDialogProps) {
         )}
 
         {/* Refund details (type=6) */}
-        {isRefund && other && (other.task_id || other.reason) && (
+        {isRefund && other && (other.task_id || other.reason || other.empty_response_refund) && (
           <DetailSection label={t('Refund Details')}>
             {other.task_id && (
               <DetailRow label={t('Task ID')} value={other.task_id} mono />
+            )}
+            {other.empty_response_planned_quota !== undefined && (
+              <DetailRow
+                label={t('Planned quota')}
+                value={formatLogQuota(other.empty_response_planned_quota)}
+                mono
+              />
             )}
             {other.reason && (
               <DetailRow label={t('Reason')} value={other.reason} />

@@ -4459,6 +4459,8 @@
     "Price (local currency / USD)": "Giá (tiền tệ địa phương / USD)",
     "Price display": "Hiển thị giá",
     "Price display mode": "Chế độ hiển thị giá",
+    "Pricing display ratios": "Tỷ lệ hiển thị giá",
+    "JSON array of ratios shown in the model square price switcher": "Mảng JSON các tỷ lệ hiển thị trong bộ chuyển giá của quảng trường mô hình",
     "Price estimation": "Ước tính chi phí",
     "Price estimation description": "Sau khi hoàn thành loại phần cứng, vị trí triển khai, số lượng bản sao, v.v., giá sẽ được tính toán tự động.",
     "Price examples": "Ví dụ giá",
@@ -6777,6 +6779,18 @@
     "Zhipu": "Zhipu",
     "Zhipu GLM": "Zhipu GLM",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Error Response Messages": "Thông báo lỗi phản hồi",
+    "Enable custom error messages": "Bật thông báo lỗi tùy chỉnh",
+    "Replace only the returned error.message by error code. Logs and error codes are kept unchanged.": "Chỉ thay thế error.message trả về theo mã lỗi. Nhật ký và mã lỗi được giữ nguyên.",
+    "Error code": "Mã lỗi",
+    "Returned message": "Thông báo trả về",
+    "Message returned to users": "Thông báo gửi cho người dùng",
+    "Error codes must be unique": "Mã lỗi phải là duy nhất",
+    "Message cannot be empty": "Thông báo không được để trống",
+    "No custom error messages configured.": "Chưa cấu hình thông báo lỗi tùy chỉnh.",
+    "Add mapping": "Thêm ánh xạ",
+    "Use default mappings": "Dùng ánh xạ mặc định",
+    "Save error messages": "Lưu thông báo lỗi"
   }
 }

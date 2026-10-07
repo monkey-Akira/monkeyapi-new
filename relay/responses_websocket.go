@@ -878,7 +878,7 @@ func buildResponsesWSErrorPayload(eventID, streamID string, apiErr *types.NewAPI
 	if status == 0 {
 		status = http.StatusInternalServerError
 	}
-	openaiErr := apiErr.ToOpenAIError()
+	openaiErr := common.ToOpenAIErrorWithCustomMessage(apiErr)
 	return common.Marshal(&responsesWSErrorEvent{
 		Type:     "error",
 		Status:   status,

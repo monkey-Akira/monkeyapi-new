@@ -92,6 +92,54 @@ const (
 	LogTypeLogin   = 7
 )
 
+func applyUserErrorMessage(log *Log, otherMap map[string]any) {
+	if log == nil || log.Type != LogTypeError || otherMap == nil {
+		return
+	}
+	errorCode, _ := otherMap["error_code"].(string)
+	messageCode, _ := otherMap["error_message_code"].(string)
+	missingErrorCode := errorCode == "" || errorCode == "unknown_error" || errorCode == "bad_response_status_code"
+	if missingErrorCode && strings.Contains(strings.ToLower(log.Content), "no available accounts") {
+		messageCode = "no_available_accounts"
+	}
+	if strings.TrimSpace(messageCode) == "" {
+		messageCode = errorCode
+	}
+	if strings.TrimSpace(messageCode) == "" {
+		return
+	}
+	candidates := []string{messageCode}
+	if errorCode != "" {
+		candidates = append(candidates, errorCode)
+	}
+	statusCode, _ := otherMap["status_code"].(float64)
+	if missingErrorCode && statusCode > 0 {
+		candidates = append(candidates, fmt.Sprintf("http_%d", int(statusCode)))
+	}
+	seen := make(map[string]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		if _, ok := seen[candidate]; ok {
+			continue
+		}
+		seen[candidate] = struct{}{}
+		if customMessage := common.GetCustomErrorMessage("upstream:" + candidate); customMessage != "" {
+			if statusCode > 0 {
+				log.Content = fmt.Sprintf("status_code=%d, %s", int(statusCode), customMessage)
+			} else {
+				log.Content = customMessage
+			}
+			return
+		}
+	}
+	if customMessage := common.GetCustomErrorMessage(errorCode); customMessage != "" {
+		if statusCode > 0 {
+			log.Content = fmt.Sprintf("status_code=%d, %s", int(statusCode), customMessage)
+		} else {
+			log.Content = customMessage
+		}
+	}
+}
+
 func ensureLogRequestId(log *Log) {
 	if log != nil && log.RequestId == "" {
 		log.RequestId = common.NewRequestId()
@@ -116,6 +164,18 @@ func assignDisplayLogIds(logs []*Log, startIdx int) {
 func formatUserLogs(logs []*Log, startIdx int) {
 	for i := range logs {
 		logs[i].ChannelName = ""
+		var otherMap map[string]any
+		_ = common.UnmarshalJsonStr(logs[i].Other, &otherMap)
+		applyUserErrorMessage(logs[i], otherMap)
+		if logs[i].Type == LogTypeError && otherMap != nil {
+			if _, exists := otherMap["error_message_code"]; exists {
+				delete(otherMap, "error_message_code")
+				if sanitized, err := common.Marshal(otherMap); err == nil {
+					logs[i].Other = formatLogOtherJSON(string(sanitized), logOtherVisibilityUser)
+					continue
+				}
+			}
+		}
 		logs[i].Other = formatLogOtherJSON(logs[i].Other, logOtherVisibilityUser)
 	}
 	assignDisplayLogIds(logs, startIdx)
@@ -396,6 +456,50 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 			ChannelID: params.ChannelId,
 			NodeName:  common.NodeName,
 		})
+	}
+}
+
+type RecordRefundLogParams struct {
+	ChannelId        int
+	PromptTokens     int
+	CompletionTokens int
+	ModelName        string
+	TokenName        string
+	Quota            int
+	Content          string
+	TokenId          int
+	UseTimeSeconds   int
+	IsStream         bool
+	Group            string
+	Other            *LogOther
+}
+
+func RecordRefundLog(c *gin.Context, userId int, params RecordRefundLogParams) {
+	username := c.GetString("username")
+	requestId := c.GetString(common.RequestIdKey)
+	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
+	log := &Log{
+		UserId:            userId,
+		Username:          username,
+		CreatedAt:         common.GetTimestamp(),
+		Type:              LogTypeRefund,
+		Content:           params.Content,
+		PromptTokens:      params.PromptTokens,
+		CompletionTokens:  params.CompletionTokens,
+		TokenName:         params.TokenName,
+		ModelName:         params.ModelName,
+		Quota:             params.Quota,
+		ChannelId:         params.ChannelId,
+		TokenId:           params.TokenId,
+		UseTime:           params.UseTimeSeconds,
+		IsStream:          params.IsStream,
+		Group:             params.Group,
+		RequestId:         requestId,
+		UpstreamRequestId: upstreamRequestId,
+		Other:             params.Other.JSONString(),
+	}
+	if err := createLog(log); err != nil {
+		logger.LogError(c, "failed to record refund log: "+err.Error())
 	}
 }
 

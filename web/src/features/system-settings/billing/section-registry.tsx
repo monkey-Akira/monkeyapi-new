@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { parseCurrencyDisplayType } from '@/lib/currency'
 
+import { EmptyResponseRefundSection } from './empty-response-refund-section'
 import { CheckinSettingsSection } from '../general/checkin-settings-section'
 import { PricingSection } from '../general/pricing-section'
 import { QuotaSettingsSection } from '../general/quota-settings-section'
@@ -143,6 +144,8 @@ const BILLING_SECTIONS = [
           PayMethods: settings.PayMethods,
           AmountOptions: settings['payment_setting.amount_options'],
           AmountDiscount: settings['payment_setting.amount_discount'],
+          PricingDisplayRatios:
+            settings['payment_setting.pricing_display_ratios'],
           StripeApiSecret: settings.StripeApiSecret,
           StripeWebhookSecret: settings.StripeWebhookSecret,
           StripePriceId: settings.StripePriceId,
@@ -185,6 +188,22 @@ const BILLING_SECTIONS = [
           confirmedAt: settings['payment_setting.compliance_confirmed_at'] ?? 0,
           confirmedBy: settings['payment_setting.compliance_confirmed_by'] ?? 0,
         }}
+      />
+    ),
+  },
+  {
+    id: 'empty-response-refund',
+    titleKey: 'Empty Response Refund',
+    build: (settings: BillingSettings) => (
+      <EmptyResponseRefundSection
+        defaultMode={settings['empty_response_refund_setting.mode']}
+        defaultModels={settings['empty_response_refund_setting.models']}
+        defaultCustomResponseEnabled={
+          settings['empty_response_refund_setting.custom_response_enabled']
+        }
+        defaultCustomResponseText={
+          settings['empty_response_refund_setting.custom_response_text']
+        }
       />
     ),
   },

@@ -99,6 +99,10 @@ type RelayInfo struct {
 	UsePrice               bool
 	RelayMode              int
 	OriginModelName        string
+	// RequestedModelName preserves the exact client model for model-specific policies.
+	RequestedModelName string
+	// RequestedZeroMaxOutput records an explicitly supplied zero output limit.
+	RequestedZeroMaxOutput bool
 	ResponseModel          *ResponseModel
 
 	// BillingModelName is the pricing identity for this request. It is kept
@@ -602,7 +606,9 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 		UserQuota:  common.GetContextKeyInt(c, constant.ContextKeyUserQuota),
 		UserEmail:  common.GetContextKeyString(c, constant.ContextKeyUserEmail),
 
-		OriginModelName: originModelName,
+		OriginModelName:        originModelName,
+		RequestedModelName:     originModelName,
+		RequestedZeroMaxOutput: requestedZeroMaxOutput(request),
 
 		TokenId:        common.GetContextKeyInt(c, constant.ContextKeyTokenId),
 		TokenKey:       common.GetContextKeyString(c, constant.ContextKeyTokenKey),
@@ -645,6 +651,29 @@ func genBaseRelayInfo(c *gin.Context, request dto.Request) *RelayInfo {
 	return info
 }
 
+func requestedZeroMaxOutput(request dto.Request) bool {
+	switch req := request.(type) {
+	case *dto.GeneralOpenAIRequest:
+		if req == nil {
+			return false
+		}
+		return req.MaxCompletionTokens != nil && *req.MaxCompletionTokens == 0 ||
+			req.MaxTokens != nil && *req.MaxTokens == 0
+	case *dto.OpenAIResponsesRequest:
+		return req != nil && req.MaxOutputTokens != nil && *req.MaxOutputTokens == 0
+	case *dto.ClaudeRequest:
+		if req == nil {
+			return false
+		}
+		return req.MaxTokens != nil && *req.MaxTokens == 0 ||
+			req.MaxTokensToSample != nil && *req.MaxTokensToSample == 0
+	case *dto.GeminiChatRequest:
+		return req != nil && req.GenerationConfig.MaxOutputTokens != nil &&
+			*req.GenerationConfig.MaxOutputTokens == 0
+	default:
+		return false
+	}
+}
 func cloneRequestHeaders(c *gin.Context) map[string]string {
 	if c == nil || c.Request == nil {
 		return nil

@@ -24,6 +24,19 @@ import { requireServerSuccess } from '@/lib/server-error-message'
 
 import { getPricing } from '../api'
 
+function parseRatioList(value: unknown): number[] {
+  const source = Array.isArray(value) ? value : []
+  return source
+    .map((item) => Number(item))
+    .filter((item, index, array) => {
+      return (
+        Number.isFinite(item) &&
+        item > 0 &&
+        array.findIndex((candidate) => candidate === item) === index
+      )
+    })
+}
+
 export function usePricingData(enabled = true) {
   const { status } = useStatus()
 
@@ -42,6 +55,10 @@ export function usePricingData(enabled = true) {
   const usdExchangeRate = useMemo(
     () => Math.max((status?.usd_exchange_rate as number) ?? priceRate, 0.001),
     [status?.usd_exchange_rate, priceRate]
+  )
+  const pricingDisplayRatios = useMemo(
+    () => parseRatioList(status?.pricing_display_ratios),
+    [status?.pricing_display_ratios]
   )
 
   const models = useMemo(() => {
@@ -76,5 +93,6 @@ export function usePricingData(enabled = true) {
     refetch,
     priceRate,
     usdExchangeRate,
+    pricingDisplayRatios,
   }
 }

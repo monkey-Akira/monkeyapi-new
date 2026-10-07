@@ -4459,6 +4459,8 @@
     "Price (local currency / USD)": "価格 (現地通貨 / USD)",
     "Price display": "価格表示",
     "Price display mode": "価格表示モード",
+    "Pricing display ratios": "価格表示比率",
+    "JSON array of ratios shown in the model square price switcher": "モデル広場の価格切り替えに表示する比率の JSON 配列",
     "Price estimation": "料金見積もり",
     "Price estimation description": "ハードウェアタイプ、デプロイ場所、レプリカ数などを設定すると、料金が自動的に計算されます。",
     "Price examples": "価格例",
@@ -6777,6 +6779,18 @@
     "Zhipu": "Zhipu",
     "Zhipu GLM": "Zhipu GLM",
     "Zhipu V4": "Zhipu V 4",
-    "Zoom": "ズーム"
+    "Zoom": "ズーム",
+    "Error Response Messages": "エラーレスポンスメッセージ",
+    "Enable custom error messages": "カスタムエラーメッセージを有効化",
+    "Replace only the returned error.message by error code. Logs and error codes are kept unchanged.": "エラーコードに応じて返却する error.message のみ置き換えます。ログとエラーコードは変更しません。",
+    "Error code": "エラーコード",
+    "Returned message": "返却メッセージ",
+    "Message returned to users": "ユーザーに返すメッセージ",
+    "Error codes must be unique": "エラーコードは一意である必要があります",
+    "Message cannot be empty": "メッセージを空にできません",
+    "No custom error messages configured.": "カスタムエラーメッセージは未設定です。",
+    "Add mapping": "マッピングを追加",
+    "Use default mappings": "既定のマッピングを使用",
+    "Save error messages": "エラーメッセージを保存"
   }
 }

@@ -65,6 +65,7 @@ func ProcessChannelError(c *gin.Context, channelError types.ChannelError, err *t
 	if err == nil {
 		return
 	}
+	err.MarkAsUpstreamError()
 	logger.LogError(c, fmt.Sprintf("channel error (channel #%d, status code: %d): %s", channelError.ChannelId, err.StatusCode, common.LocalLogPreview(err.MaskSensitiveErrorWithStatusCode())))
 	if ShouldDisableChannel(err) && channelError.AutoBan {
 		reason := err.MaskSensitiveErrorWithStatusCode()
@@ -85,6 +86,9 @@ func ProcessChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		}
 		other.SetPublic("error_type", err.GetErrorType())
 		other.SetPublic("error_code", err.GetErrorCode())
+		if errorMessageCode := err.GetErrorMessageCode(); errorMessageCode != "" && errorMessageCode != string(err.GetErrorCode()) {
+			other.SetPublic("error_message_code", errorMessageCode)
+		}
 		other.SetPublic("status_code", err.StatusCode)
 		AppendRelayLogAdminInfo(c, relayInfo, other)
 		AppendResponseModelLogInfo(relayInfo, other)

@@ -133,6 +133,11 @@ export type PricingData = {
 }
 
 export type TokenUnit = 'M' | 'K'
+export type PriceDisplayOption = {
+  value: string
+  label: string
+  priceRate?: number
+}
 export type PriceType =
   | 'input'
   | 'output'

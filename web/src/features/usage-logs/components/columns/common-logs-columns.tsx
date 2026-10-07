@@ -142,7 +142,7 @@ function buildTypeDetailSegments(
   }
 
   if (log.type === 6) {
-    return [{ text: t('Async task refund') }]
+    return [{ text: t(other?.empty_response_refund ? 'Empty response refund' : 'Async task refund') }]
   }
 
   if (log.type !== 2) return []

@@ -33,6 +33,9 @@ import {
 import { filterAndSortModels, extractAllTags } from '../lib/filters'
 import type { PricingModel, TokenUnit } from '../types'
 
+export const STANDARD_PRICE_MODE = 'standard'
+export const RECHARGE_PRICE_MODE = 'recharge'
+
 type FilterState = {
   search?: string
   sort?: string
@@ -44,6 +47,7 @@ type FilterState = {
   tokenUnit?: TokenUnit
   view?: ViewMode
   rechargePrice?: boolean
+  priceMode?: string
 }
 
 function normalizeViewMode(value: unknown): ViewMode {
@@ -66,6 +70,7 @@ export function useFilters(models: PricingModel[]) {
     tokenUnit: search.tokenUnit,
     view: search.view,
     rechargePrice: search.rechargePrice,
+    priceMode: search.priceMode,
   }))
 
   const searchInput = filterState.search || ''
@@ -79,7 +84,12 @@ export function useFilters(models: PricingModel[]) {
   const tokenUnit: TokenUnit =
     filterState.tokenUnit === 'K' ? 'K' : DEFAULT_TOKEN_UNIT
   const viewMode = normalizeViewMode(filterState.view)
-  const showRechargePrice = filterState.rechargePrice === true
+  const priceDisplayMode =
+    filterState.priceMode ||
+    (filterState.rechargePrice === true
+      ? RECHARGE_PRICE_MODE
+      : STANDARD_PRICE_MODE)
+  const showRechargePrice = priceDisplayMode !== STANDARD_PRICE_MODE
 
   const updateFilters = useCallback((updates: Record<string, unknown>) => {
     setFilterState((prev) => {
@@ -136,8 +146,20 @@ export function useFilters(models: PricingModel[]) {
       updateFilters({ view: v === VIEW_MODES.CARD ? undefined : v }),
     [updateFilters]
   )
+  const setPriceDisplayMode = useCallback(
+    (v: string) =>
+      updateFilters({
+        priceMode: v === STANDARD_PRICE_MODE ? undefined : v,
+        rechargePrice: undefined,
+      }),
+    [updateFilters]
+  )
   const setShowRechargePrice = useCallback(
-    (v: boolean) => updateFilters({ rechargePrice: v || undefined }),
+    (v: boolean) =>
+      updateFilters({
+        rechargePrice: v || undefined,
+        priceMode: undefined,
+      }),
     [updateFilters]
   )
 
@@ -213,6 +235,7 @@ export function useFilters(models: PricingModel[]) {
     tagFilter,
     tokenUnit,
     viewMode,
+    priceDisplayMode,
     showRechargePrice,
     setSearchInput,
     setSortBy,
@@ -223,6 +246,7 @@ export function useFilters(models: PricingModel[]) {
     setTagFilter,
     setTokenUnit,
     setViewMode,
+    setPriceDisplayMode,
     setShowRechargePrice,
     filteredModels,
     hasActiveFilters,

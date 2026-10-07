@@ -84,8 +84,52 @@ func ClaudeErrorWrapperLocal(err error, code string, statusCode int) *dto.Claude
 	return claudeErr
 }
 
+func isEmptyUpstreamErrorCode(code any) bool {
+
+	switch value := code.(type) {
+
+	case nil:
+
+		return true
+
+	case string:
+
+		value = strings.TrimSpace(value)
+
+		return value == "" || strings.EqualFold(value, "<nil>")
+
+	default:
+
+		return false
+
+	}
+}
+
+func setUpstreamErrorMessageCode(apiError *types.NewAPIError, statusCode int, message string, code any) {
+
+	if apiError == nil || !isEmptyUpstreamErrorCode(code) {
+
+		return
+
+	}
+
+	if strings.Contains(strings.ToLower(message), "no available accounts") {
+
+		apiError.SetErrorMessageCode("no_available_accounts")
+
+		return
+
+	}
+
+	if statusCode > 0 {
+
+		apiError.SetErrorMessageCode(fmt.Sprintf("http_%d", statusCode))
+
+	}
+}
+
 func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFail bool) (newApiErr *types.NewAPIError) {
-	newApiErr = types.InitOpenAIError(types.ErrorCodeBadResponseStatusCode, resp.StatusCode)
+	newApiErr = types.InitOpenAIError(types.ErrorCodeBadResponseStatusCode, resp.StatusCode, types.ErrOptionWithUpstreamError())
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -95,6 +139,7 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 	var errResponse dto.GeneralErrorResponse
 	responseBodyText := string(responseBody)
 	responseBodyPreview := common.LocalLogPreview(responseBodyText)
+	setUpstreamErrorMessageCode(newApiErr, resp.StatusCode, responseBodyText, nil)
 	buildErrWithBody := func(message string) error {
 		if message == "" {
 			return fmt.Errorf("bad response status code %d, body: %s", resp.StatusCode, responseBodyText)
@@ -117,7 +162,8 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 		// General format error (OpenAI, Anthropic, Gemini, etc.)
 		oaiError := errResponse.TryToOpenAIError()
 		if oaiError != nil {
-			newApiErr = types.WithOpenAIError(*oaiError, resp.StatusCode)
+			newApiErr = types.WithOpenAIError(*oaiError, resp.StatusCode, types.ErrOptionWithUpstreamError())
+			setUpstreamErrorMessageCode(newApiErr, resp.StatusCode, oaiError.Message, oaiError.Code)
 			if showBodyWhenFail {
 				newApiErr.Err = buildErrWithBody(newApiErr.Error())
 			}
@@ -130,7 +176,8 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 		// raw body so the upstream failure remains diagnosable.
 		logger.LogError(ctx, fmt.Sprintf("bad response status code %d with empty error message, body: %s", resp.StatusCode, responseBodyPreview))
 	}
-	newApiErr = types.NewOpenAIError(errors.New(message), types.ErrorCodeBadResponseStatusCode, resp.StatusCode)
+	newApiErr = types.NewOpenAIError(errors.New(message), types.ErrorCodeBadResponseStatusCode, resp.StatusCode, types.ErrOptionWithUpstreamError())
+	setUpstreamErrorMessageCode(newApiErr, resp.StatusCode, message, nil)
 	if showBodyWhenFail {
 		newApiErr.Err = buildErrWithBody(newApiErr.Error())
 	}

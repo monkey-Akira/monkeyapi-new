@@ -19,6 +19,29 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func openAIResponseHasText(response *dto.OpenAITextResponse) bool {
+	if response == nil {
+		return false
+	}
+	for _, choice := range response.Choices {
+		if strings.TrimSpace(choice.Message.StringContent()) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func openAIResponseHasNonText(response *dto.OpenAITextResponse) bool {
+	if response == nil {
+		return false
+	}
+	for _, choice := range response.Choices {
+		if len(choice.Message.ParseToolCalls()) > 0 {
+			return true
+		}
+	}
+	return false
+}
 func sendStreamData(c *gin.Context, info *relaycommon.RelayInfo, data string, forceFormat bool, thinkToContent bool) error {
 	if data == "" {
 		return nil
@@ -186,6 +209,21 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 	}
 
 	applyUsagePostProcessing(info, usage, common.StringToByteSlice(usageFrame))
+	if customText := service.GetEmptyResponseRefundCustomText(c, info, usage, toolCount > 0); customText != "" && responseTextBuilder.Len() == 0 {
+		customResponse := &dto.ChatCompletionsStreamResponse{
+			Id:      responseId,
+			Object:  "chat.completion.chunk",
+			Created: createAt,
+			Model:   model,
+			Choices: []dto.ChatCompletionsStreamResponseChoice{{
+				Index: 0,
+				Delta: dto.ChatCompletionsStreamResponseChoiceDelta{Content: &customText},
+			}},
+		}
+		if err := sendStreamData(c, info, common.GetJsonString(customResponse), info.ChannelSetting.ForceFormat, info.ChannelSetting.ThinkingToContent); err != nil {
+			logger.LogError(c, "failed to send empty response custom text: "+err.Error())
+		}
+	}
 
 	for _, name := range streamFunctionCallNames {
 		info.CountBillableToolCall(dto.BuildInCallFunctionCall, name)
@@ -321,10 +359,29 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 	}
 
 	applyUsagePostProcessing(info, &simpleResponse.Usage, responseBody)
+	customResponseApplied := false
+	if customText := service.GetEmptyResponseRefundCustomText(c, info, &simpleResponse.Usage, openAIResponseHasNonText(&simpleResponse)); customText != "" && !openAIResponseHasText(&simpleResponse) {
+		for i := range simpleResponse.Choices {
+			simpleResponse.Choices[i].Message.SetStringContent(customText)
+		}
+		if len(simpleResponse.Choices) == 0 {
+			simpleResponse.Choices = []dto.OpenAITextResponseChoice{{
+				Index:        0,
+				Message:      dto.Message{Role: "assistant", Content: customText},
+				FinishReason: "stop",
+			}}
+		}
+		customResponseApplied = true
+	}
 
 	switch info.RelayFormat {
 	case types.RelayFormatOpenAI:
-		if usageModified {
+		if customResponseApplied || forceFormat {
+			responseBody, err = common.Marshal(simpleResponse)
+			if err != nil {
+				return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
+			}
+		} else if usageModified {
 			var bodyMap map[string]any
 			err = common.Unmarshal(responseBody, &bodyMap)
 			if err != nil {
@@ -332,14 +389,6 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 			}
 			bodyMap["usage"] = simpleResponse.Usage
 			responseBody, _ = common.Marshal(bodyMap)
-		}
-		if forceFormat {
-			responseBody, err = common.Marshal(simpleResponse)
-			if err != nil {
-				return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
-			}
-		} else {
-			break
 		}
 	case types.RelayFormatClaude:
 		convertResult, err := service.ConvertResponse(c, info, types.RelayFormatClaude, &simpleResponse)

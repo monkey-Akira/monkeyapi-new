@@ -34,6 +34,12 @@ export type UpdateOptionRequest = {
   value: string | boolean | number
 }
 
+export type EmptyResponseRefundSettingRequest = {
+  mode: 'off' | 'observe' | 'refund'
+  models: string[]
+  custom_response_enabled: boolean
+  custom_response_text: string
+}
 export type UpdateOptionResponse = {
   success: boolean
   message: string
@@ -315,6 +321,7 @@ export type BillingSettings = {
   PayMethods: string
   'payment_setting.amount_options': string
   'payment_setting.amount_discount': string
+  'payment_setting.pricing_display_ratios': string
   'payment_setting.compliance_confirmed': boolean
   'payment_setting.compliance_terms_version': string
   'payment_setting.compliance_confirmed_at': number
@@ -352,6 +359,10 @@ export type BillingSettings = {
   // section (saved via /api/option/waffo-pancake/save).
   WaffoPancakeStoreID: string
   WaffoPancakeProductID: string
+  'empty_response_refund_setting.mode': string
+  'empty_response_refund_setting.models': string
+  'empty_response_refund_setting.custom_response_enabled': boolean
+  'empty_response_refund_setting.custom_response_text': string
   'checkin_setting.enabled': boolean
   'checkin_setting.min_quota': number
   'checkin_setting.max_quota': number
@@ -379,6 +390,8 @@ export type OperationsSettings = {
   WorkerValidKey: string
   WorkerAllowHttpImageRequestEnabled: boolean
   LogConsumeEnabled: boolean
+  'error_message_setting.enabled': boolean
+  'error_message_setting.mappings': string
   'performance_setting.disk_cache_enabled': boolean
   'performance_setting.disk_cache_threshold_mb': number
   'performance_setting.disk_cache_max_size_mb': number

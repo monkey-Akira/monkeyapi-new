@@ -4459,6 +4459,8 @@
     "Price (local currency / USD)": "Цена (местная валюта / USD)",
     "Price display": "Отображение цены",
     "Price display mode": "Режим отображения цены",
+    "Pricing display ratios": "Коэффициенты отображения цен",
+    "JSON array of ratios shown in the model square price switcher": "Массив JSON с коэффициентами для переключателя цен в каталоге моделей",
     "Price estimation": "Оценка стоимости",
     "Price estimation description": "После настройки типа оборудования, места размещения, количества реплик и т.д. стоимость будет рассчитана автоматически.",
     "Price examples": "Примеры цен",
@@ -6777,6 +6779,18 @@
     "Zhipu": "Zhipu",
     "Zhipu GLM": "Zhipu GLM",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Error Response Messages": "Сообщения об ошибках ответа",
+    "Enable custom error messages": "Включить пользовательские сообщения об ошибках",
+    "Replace only the returned error.message by error code. Logs and error codes are kept unchanged.": "Заменяется только error.message по коду ошибки. Журналы и коды остаются без изменений.",
+    "Error code": "Код ошибки",
+    "Returned message": "Возвращаемое сообщение",
+    "Message returned to users": "Сообщение для пользователей",
+    "Error codes must be unique": "Коды ошибок должны быть уникальными",
+    "Message cannot be empty": "Сообщение не может быть пустым",
+    "No custom error messages configured.": "Пользовательские сообщения не настроены.",
+    "Add mapping": "Добавить правило",
+    "Use default mappings": "Использовать правила по умолчанию",
+    "Save error messages": "Сохранить сообщения об ошибках"
   }
 }
