@@ -16,7 +16,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import type { QueryClient } from '@tanstack/react-query'
 import { getStatus } from '@/lib/api'
+import { statusQueryOptions } from '@/lib/status-query'
 import {
   getSidebarVisibilityMap,
   parseHeaderNavModules,
@@ -86,6 +88,18 @@ export async function getFreshModuleAccess(
   try {
     const status = (await getStatus()) as Record<string, unknown> | null
     cacheStatus(status)
+    return getModuleAccessFromStatus(status, module)
+  } catch {
+    return { enabled: false, requireAuth: true }
+  }
+}
+
+export async function getModuleAccessForGuard(
+  queryClient: QueryClient,
+  module: HeaderNavModule
+): Promise<ModuleAccess> {
+  try {
+    const status = await queryClient.fetchQuery(statusQueryOptions)
     return getModuleAccessFromStatus(status, module)
   } catch {
     return { enabled: false, requireAuth: true }

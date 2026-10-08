@@ -28,6 +28,14 @@ import type { NavGroup, NavItem } from '@/components/layout/types'
 
 type SidebarModulesUserConfig = SidebarVisibilityConfig | null
 
+const USER_MENU_URL_TO_CONFIG_MAP: Record<
+  string,
+  { section: string; module: string }
+> = {
+  '/wallet': { section: 'personal', module: 'topup' },
+  '/security': { section: 'personal', module: 'security' },
+}
+
 const URL_TO_CONFIG_MAP: Record<string, { section: string; module: string }> = {
   '/playground': { section: 'chat', module: 'playground' },
   '/dashboard': { section: 'console', module: 'detail' },
@@ -80,6 +88,51 @@ function parseUserSidebarConfig(
   } catch {
     return null
   }
+}
+
+function parseSidebarVisibilityConfig(
+  value: unknown
+): SidebarVisibilityConfig | null {
+  let parsed = value
+
+  if (typeof parsed === 'string') {
+    if (!parsed.trim()) return null
+    try {
+      parsed = JSON.parse(parsed)
+    } catch {
+      return null
+    }
+  }
+
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return null
+  }
+
+  const config = parsed as Record<string, unknown>
+  if (Array.isArray(config.sections)) {
+    return getSidebarVisibilityMap(parseSidebarModulesAdmin(config))
+  }
+
+  return config as SidebarVisibilityConfig
+}
+
+function isModuleExplicitlyDisabled(
+  config: SidebarVisibilityConfig | null,
+  section: string,
+  module: string
+): boolean {
+  const sectionConfig = config?.[section]
+  if (!sectionConfig) return false
+
+  const moduleConfig = (sectionConfig as Record<string, unknown>)[module]
+  return (
+    sectionConfig.enabled === false ||
+    moduleConfig === false ||
+    (typeof moduleConfig === 'object' &&
+      moduleConfig !== null &&
+      'enabled' in moduleConfig &&
+      moduleConfig.enabled === false)
+  )
 }
 
 function isModuleEnabledByKey(
@@ -215,4 +268,36 @@ export function useSidebarConfig(navGroups: NavGroup[]): NavGroup[] {
         .filter((group) => group.items.length > 0),
     [navGroups, adminConfig, userConfig]
   )
+}
+
+export function useIsSidebarModuleVisible(url: string): boolean {
+  const { status } = useStatus()
+  const user = useAuthStore((state) => state.auth.user)
+  const mapping = USER_MENU_URL_TO_CONFIG_MAP[url]
+
+  return useMemo(() => {
+    if (!mapping) return true
+
+    const adminConfig = parseSidebarVisibilityConfig(
+      status?.SidebarModulesAdmin
+    )
+    if (
+      isModuleExplicitlyDisabled(
+        adminConfig,
+        mapping.section,
+        mapping.module
+      )
+    ) {
+      return false
+    }
+
+    if (user?.permissions?.sidebar_settings === false) return true
+
+    const userConfig = parseUserSidebarConfig(user?.sidebar_modules)
+    return !isModuleExplicitlyDisabled(
+      userConfig,
+      mapping.section,
+      mapping.module
+    )
+  }, [mapping, status?.SidebarModulesAdmin, user])
 }
