@@ -1,9 +1,11 @@
 package common
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestInitUserSessionSettingsUsesPositiveFallbacksAndClampsWindow(t *testing.T) {
@@ -57,4 +59,34 @@ func TestInitUserSessionSettingsUsesPositiveFallbacksAndClampsWindow(t *testing.
 	t.Setenv("USER_SESSION_REVOKED_RETENTION_DAYS", "9223372036854775807")
 	initUserSessionSettings()
 	assert.Equal(t, DefaultUserSessionRevokedRetentionDays, UserSessionRevokedRetentionDays)
+}
+
+func TestValidateSessionSecret(t *testing.T) {
+	validSecret := "0123456789abcdef0123456789abcdef"
+	tests := []struct {
+		name      string
+		secret    string
+		wantError bool
+	}{
+		{name: "minimum length", secret: validSecret},
+		{name: "too short", secret: validSecret[:31], wantError: true},
+		{name: "empty", secret: "", wantError: true},
+		{name: "placeholder", secret: "change_this_session_secret_before_use_0123456789abcdef", wantError: true},
+		{name: "repeated character", secret: strings.Repeat("a", 32), wantError: true},
+		{name: "leading whitespace", secret: " " + validSecret, wantError: true},
+		{name: "trailing whitespace", secret: validSecret + " ", wantError: true},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			err := validateSessionSecret(testCase.secret)
+			if testCase.wantError {
+				if assert.Error(t, err) && testCase.secret != "" {
+					assert.NotContains(t, err.Error(), testCase.secret, "validation errors must not expose the secret")
+				}
+				return
+			}
+			require.NoError(t, err)
+		})
+	}
 }

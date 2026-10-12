@@ -25,11 +25,20 @@ import type {
   User,
   GetUsersParams,
   GetUsersResponse,
+  GetUserInviteesParams,
+  GetUserInviteesResponse,
   SearchUsersParams,
   UserFormData,
   ManageUserAction,
   ManageUserQuotaPayload,
   ApiResponse,
+  DisableRiskAlertUsersResult,
+  DisableUserInviteesResult,
+  GetUserRiskAlertsParams,
+  GetUserRiskAlertsResponse,
+  RiskAlertStatus,
+  UserIpRiskAlertOption,
+  UserRiskAlertDetail,
 } from './types'
 
 // ============================================================================
@@ -91,6 +100,32 @@ export async function getUser(id: number): Promise<ApiResponse<User>> {
   return res.data
 }
 
+export async function getUserInvitees(
+  id: number,
+  params: GetUserInviteesParams = {}
+): Promise<GetUserInviteesResponse> {
+  const { p = 1, page_size = 20 } = params
+  const res = await api.get(`/api/user/${id}/invitees`, {
+    params: { p, page_size },
+  })
+  return res.data
+}
+
+export async function disableUserInvitees(
+  id: number
+): Promise<ApiResponse<DisableUserInviteesResult>> {
+  const res = await api.post(`/api/user/${id}/invitees/disable`)
+  return res.data
+}
+
+export async function setUserAffCodeDisabled(
+  id: number,
+  disabled: boolean
+): Promise<ApiResponse<User>> {
+  const res = await api.put(`/api/user/${id}/aff-code-disabled`, { disabled })
+  return res.data
+}
+
 /**
  * Create a new user
  */
@@ -127,6 +162,68 @@ export async function manageUser(
   action: ManageUserAction
 ): Promise<ApiResponse<Partial<User>>> {
   const res = await api.post('/api/user/manage', { id, action })
+  return res.data
+}
+
+export async function getUserRiskAlerts(
+  params: GetUserRiskAlertsParams = {}
+): Promise<GetUserRiskAlertsResponse> {
+  const { status = 'open', p = 1, page_size = 10 } = params
+  const queryParams = new URLSearchParams()
+  queryParams.set('status', status)
+  queryParams.set('p', String(p))
+  queryParams.set('page_size', String(page_size))
+  const res = await api.get(`/api/user/risk_alerts?${queryParams.toString()}`)
+  return res.data
+}
+
+export async function getUserRiskAlert(
+  id: number
+): Promise<ApiResponse<UserRiskAlertDetail>> {
+  const res = await api.get(`/api/user/risk_alerts/${id}`)
+  return res.data
+}
+
+export async function updateUserRiskAlertStatus(
+  id: number,
+  status: RiskAlertStatus
+): Promise<ApiResponse> {
+  const res = await api.put(`/api/user/risk_alerts/${id}`, { status })
+  return res.data
+}
+
+export async function disableUserRiskAlertUsers(
+  id: number
+): Promise<ApiResponse<DisableRiskAlertUsersResult>> {
+  const res = await api.post(`/api/user/risk_alerts/${id}/disable_users`)
+  return res.data
+}
+
+export async function getUserIpRiskAlertOption(): Promise<
+  ApiResponse<UserIpRiskAlertOption>
+> {
+  const res = await api.get('/api/option/')
+  const options = Array.isArray(res.data?.data) ? res.data.data : []
+  const option = options.find(
+    (item: { key?: string; value?: string }) =>
+      item.key === 'UserIpRiskAlertEnabled'
+  )
+  return {
+    success: Boolean(res.data?.success),
+    message: res.data?.message,
+    data: {
+      enabled: option?.value !== 'false',
+    },
+  }
+}
+
+export async function updateUserIpRiskAlertOption(
+  enabled: boolean
+): Promise<ApiResponse> {
+  const res = await api.put('/api/option/', {
+    key: 'UserIpRiskAlertEnabled',
+    value: enabled,
+  })
   return res.data
 }
 

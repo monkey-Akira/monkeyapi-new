@@ -47,11 +47,14 @@ export const userSchema = z.object({
   request_count: z.number(),
   group: z.string(),
   aff_code: z.string().optional(),
+  aff_code_disabled: z.boolean().optional(),
   aff_count: z.number().optional(),
   aff_quota: z.number().optional(),
   aff_history_quota: z.number().optional(),
   inviter_id: z.number().optional(),
   linux_do_id: z.string().optional(),
+  register_ip: z.string().optional(),
+  last_login_ip: z.string().optional(),
   status: userStatusSchema,
   role: userRoleSchema,
   created_at: z.number().optional(),
@@ -106,6 +109,83 @@ export interface GetUsersResponse {
   }
 }
 
+export type RiskAlertStatus = 'open' | 'handled' | 'ignored'
+
+export interface GetUserInviteesParams {
+  p?: number
+  page_size?: number
+}
+
+export type GetUserInviteesResponse = GetUsersResponse
+
+export interface UserRiskAlert {
+  id: number
+  ip: string
+  user_count: number
+  register_count: number
+  login_count: number
+  reason: string
+  status: RiskAlertStatus
+  created_at: number
+  updated_at: number
+}
+
+export interface RiskAlertUser {
+  id: number
+  username: string
+  display_name: string
+  email?: string
+  status: number
+  role: number
+  quota: number
+  used_quota: number
+  request_count: number
+  register_ip?: string
+  last_login_ip?: string
+  created_at: number
+  last_login_at: number
+  register_matched: boolean
+  login_matched: boolean
+}
+
+export interface GetUserRiskAlertsParams {
+  status?: RiskAlertStatus | 'all'
+  p?: number
+  page_size?: number
+}
+
+export interface GetUserRiskAlertsResponse {
+  success: boolean
+  message?: string
+  data?: {
+    items: UserRiskAlert[]
+    total: number
+    page: number
+    page_size: number
+  }
+}
+
+export interface UserRiskAlertDetail {
+  alert: UserRiskAlert
+  users: RiskAlertUser[]
+}
+
+export interface DisableRiskAlertUsersResult {
+  disabled_count: number
+  skipped_count: number
+  disabled_ids: number[]
+}
+
+export interface DisableUserInviteesResult {
+  disabled_count: number
+  skipped_count: number
+  disabled_ids: number[]
+  skipped_ids: number[]
+}
+
+export interface UserIpRiskAlertOption {
+  enabled: boolean
+}
 export interface SearchUsersParams {
   keyword?: string
   group?: string

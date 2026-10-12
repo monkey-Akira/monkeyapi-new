@@ -47,15 +47,11 @@ func InitEnv() {
 		os.Exit(0)
 	}
 
-	if os.Getenv("SESSION_SECRET") != "" {
-		ss := os.Getenv("SESSION_SECRET")
-		if ss == "random_string" {
-			log.Println("WARNING: SESSION_SECRET is set to the default value 'random_string', please change it to a random string.")
-			log.Println("警告：SESSION_SECRET被设置为默认值'random_string'，请修改为随机字符串。")
-			log.Fatal("Please set SESSION_SECRET to a random string.")
-		} else {
-			SessionSecret = ss
+	if secret, ok := os.LookupEnv("SESSION_SECRET"); ok {
+		if err := validateSessionSecret(secret); err != nil {
+			log.Fatalf("invalid SESSION_SECRET: %v", err)
 		}
+		SessionSecret = secret
 	}
 	if os.Getenv("CRYPTO_SECRET") != "" {
 		CryptoSecret = os.Getenv("CRYPTO_SECRET")
@@ -136,6 +132,43 @@ func InitEnv() {
 	SearchRateLimitNum = GetEnvOrDefault("SEARCH_RATE_LIMIT", 10)
 	SearchRateLimitDuration = int64(GetEnvOrDefault("SEARCH_RATE_LIMIT_DURATION", 60))
 	initConstantEnv()
+}
+
+func validateSessionSecret(secret string) error {
+	if secret == "" {
+		return fmt.Errorf("must not be empty")
+	}
+	if strings.TrimSpace(secret) != secret {
+		return fmt.Errorf("must not contain leading or trailing whitespace")
+	}
+	if len(secret) < 32 {
+		return fmt.Errorf("must be at least 32 bytes")
+	}
+
+	lowerSecret := strings.ToLower(secret)
+	weakIndicators := []string{
+		"random_string",
+		"change_this_session_secret",
+		"change_me",
+		"changeme",
+		"session_secret",
+		"your_session_secret",
+		"replace_me",
+	}
+	for _, indicator := range weakIndicators {
+		if strings.Contains(lowerSecret, indicator) {
+			return fmt.Errorf("must not use a known placeholder value")
+		}
+	}
+
+	uniqueBytes := make(map[byte]struct{})
+	for i := range len(secret) {
+		uniqueBytes[secret[i]] = struct{}{}
+	}
+	if len(uniqueBytes) < 10 {
+		return fmt.Errorf("must use a stronger random value")
+	}
+	return nil
 }
 
 func initUserSessionSettings() {

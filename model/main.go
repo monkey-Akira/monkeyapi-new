@@ -338,6 +338,8 @@ func migrateDB() error {
 		&Channel{},
 		&Token{},
 		&User{},
+		&UserLoginIpLog{},
+		&UserRiskAlert{},
 		&UserSession{},
 		&AuthFlow{},
 		&ExternalIdentityClaim{},

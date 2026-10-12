@@ -99,6 +99,7 @@ type User struct {
 	RequestCount         int                        `json:"request_count" gorm:"type:int;default:0;"`               // request number
 	Group                string                     `json:"group" gorm:"type:varchar(64);default:'default'"`
 	AffCode              string                     `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
+	AffCodeDisabled      bool                       `json:"aff_code_disabled" gorm:"type:boolean;column:aff_code_disabled"`
 	AffCount             int                        `json:"aff_count" gorm:"type:int;default:0;column:aff_count"`
 	AffQuota             int                        `json:"aff_quota" gorm:"type:int;default:0;column:aff_quota"`           // 邀请剩余额度
 	AffHistoryQuota      int                        `json:"aff_history_quota" gorm:"type:int;default:0;column:aff_history"` // 邀请历史额度
@@ -108,6 +109,8 @@ type User struct {
 	Setting              string                     `json:"setting" gorm:"type:text;column:setting"`
 	Remark               string                     `json:"remark,omitempty" gorm:"type:varchar(255)" validate:"max=255"`
 	StripeCustomer       string                     `json:"stripe_customer" gorm:"type:varchar(64);column:stripe_customer;index"`
+	RegisterIp           string                     `json:"register_ip,omitempty" gorm:"type:varchar(64);column:register_ip;index"`
+	LastLoginIp          string                     `json:"last_login_ip,omitempty" gorm:"type:varchar(64);column:last_login_ip;index"`
 	CreatedAt            int64                      `json:"created_at" gorm:"autoCreateTime;column:created_at"`
 	LastLoginAt          int64                      `json:"last_login_at" gorm:"default:0;column:last_login_at"`
 	AuthVersion          int64                      `json:"-" gorm:"type:bigint;not null;default:1;column:auth_version"`
@@ -469,8 +472,8 @@ func SearchUsers(keyword string, group string, role *int, status *int, startIdx 
 	query := tx.Unscoped().Model(&User{})
 
 	// 构建搜索条件
-	likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ?"
-	likeArgs := []any{"%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%"}
+	likeCondition := "username LIKE ? OR email LIKE ? OR display_name LIKE ? OR aff_code LIKE ?"
+	likeArgs := []any{"%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%", "%" + keyword + "%"}
 
 	// 尝试将关键字转换为整数ID
 	keywordInt, err := strconv.Atoi(keyword)
@@ -545,7 +548,7 @@ func GetSelfUserById(id int) (*User, error) {
 	err := DB.Model(&User{}).Select([]string{
 		"id", "username", "display_name", "role", "status", "email",
 		"github_id", "discord_id", "oidc_id", "wechat_id", "telegram_id",
-		"group", "quota", "used_quota", "request_count", "aff_code", "aff_count",
+		"group", "quota", "used_quota", "request_count", "aff_code", "aff_code_disabled", "aff_count",
 		"aff_quota", "aff_history", "inviter_id", "linux_do_id", "setting",
 		"stripe_customer", "auth_version",
 		"CASE WHEN password <> '' THEN 1 ELSE 0 END AS has_password",
@@ -561,6 +564,101 @@ func GetUserIdByAffCode(affCode string) (int, error) {
 	var user User
 	err := DB.Select("id").First(&user, "aff_code = ?", affCode).Error
 	return user.Id, err
+}
+
+func GetUserByAffCode(affCode string) (*User, error) {
+	affCode = strings.TrimSpace(affCode)
+	if affCode == "" {
+		return nil, errors.New("affCode 为空！")
+	}
+	var user User
+	err := DB.Omit("password", "access_token").First(&user, "aff_code = ?", affCode).Error
+	return &user, err
+}
+
+// GetInviterIdByAffCodeForRegister preserves optional invite-code compatibility:
+// empty or unknown codes do not block registration, while disabled codes do.
+func GetInviterIdByAffCodeForRegister(affCode string) (int, error) {
+	affCode = strings.TrimSpace(affCode)
+	if affCode == "" {
+		return 0, nil
+	}
+	user, err := GetUserByAffCode(affCode)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	if user.AffCodeDisabled {
+		return 0, ErrAffiliateCodeDisabled
+	}
+	return user.Id, nil
+}
+
+func UpdateUserAffCodeDisabled(id int, disabled bool) error {
+	if id <= 0 {
+		return errors.New("id 为空！")
+	}
+	return DB.Model(&User{}).Where("id = ?", id).Update("aff_code_disabled", disabled).Error
+}
+
+func GetUsersByInviterId(inviterId int, pageInfo *common.PageInfo) ([]*User, int64, error) {
+	query := DB.Unscoped().Model(&User{}).Where("inviter_id = ?", inviterId)
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+	var users []*User
+	if err := query.Order("id desc").Limit(pageInfo.GetPageSize()).Offset(pageInfo.GetStartIdx()).Omit("password", "access_token").Find(&users).Error; err != nil {
+		return nil, 0, err
+	}
+	return users, total, nil
+}
+
+type DisableUserInviteesResult struct {
+	DisabledCount int   `json:"disabled_count"`
+	SkippedCount  int   `json:"skipped_count"`
+	DisabledIds   []int `json:"disabled_ids"`
+	SkippedIds    []int `json:"skipped_ids"`
+}
+
+func DisableUserInvitees(inviterId int, managerRole int) (*DisableUserInviteesResult, error) {
+	var invitees []*User
+	if err := DB.Unscoped().Where("inviter_id = ?", inviterId).Find(&invitees).Error; err != nil {
+		return nil, err
+	}
+	result := &DisableUserInviteesResult{DisabledIds: []int{}, SkippedIds: []int{}}
+	for _, invitee := range invitees {
+		canManage := managerRole == common.RoleRootUser || managerRole > invitee.Role
+		if invitee.DeletedAt.Valid || invitee.Status != common.UserStatusEnabled || invitee.Role == common.RoleRootUser || !canManage {
+			result.SkippedIds = append(result.SkippedIds, invitee.Id)
+			continue
+		}
+		var current User
+		if err := DB.Where("id = ? AND status = ?", invitee.Id, common.UserStatusEnabled).First(&current).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				result.SkippedIds = append(result.SkippedIds, invitee.Id)
+				continue
+			}
+			return nil, err
+		}
+		if current.Role == common.RoleRootUser || (managerRole != common.RoleRootUser && managerRole <= current.Role) {
+			result.SkippedIds = append(result.SkippedIds, current.Id)
+			continue
+		}
+		current.Status = common.UserStatusDisabled
+		if err := current.Update(false); err != nil {
+			return nil, err
+		}
+		if err := InvalidateUserTokensCache(current.Id); err != nil {
+			return nil, err
+		}
+		result.DisabledIds = append(result.DisabledIds, current.Id)
+	}
+	result.DisabledCount = len(result.DisabledIds)
+	result.SkippedCount = len(result.SkippedIds)
+	return result, nil
 }
 
 func DeleteUserById(id int) (err error) {
@@ -738,6 +836,12 @@ func (user *User) finishInsert(inviterId int) {
 			_ = inviteUser(inviterId)
 		}
 	}
+
+	if strings.TrimSpace(user.RegisterIp) != "" {
+		if err := CheckAndUpsertIpRiskAlert(user.RegisterIp); err != nil {
+			common.SysLog(fmt.Sprintf("failed to check register ip risk for user %d: %v", user.Id, err))
+		}
+	}
 }
 
 func (user *User) FinishInsert(inviterId int) {
@@ -792,6 +896,12 @@ func (user *User) FinalizeOAuthUserCreation(inviterId int) {
 		if common.QuotaForInviter > 0 {
 			RecordLog(inviterId, LogTypeSystem, fmt.Sprintf("邀请用户赠送 %s", logger.LogQuota(common.QuotaForInviter)))
 			_ = inviteUser(inviterId)
+		}
+	}
+
+	if strings.TrimSpace(user.RegisterIp) != "" {
+		if err := CheckAndUpsertIpRiskAlert(user.RegisterIp); err != nil {
+			common.SysLog(fmt.Sprintf("failed to check register ip risk for user %d: %v", user.Id, err))
 		}
 	}
 }
@@ -1424,7 +1534,15 @@ func GetRootUser() (user *User) {
 }
 
 func UpdateUserLastLoginAt(id int) {
-	if err := DB.Model(&User{}).Where("id = ?", id).Update("last_login_at", common.GetTimestamp()).Error; err != nil {
+	UpdateUserLastLoginInfo(id, "")
+}
+
+func UpdateUserLastLoginInfo(id int, ip string) {
+	updates := map[string]any{"last_login_at": common.GetTimestamp()}
+	if ip = strings.TrimSpace(ip); ip != "" {
+		updates["last_login_ip"] = ip
+	}
+	if err := DB.Model(&User{}).Where("id = ?", id).Updates(updates).Error; err != nil {
 		common.SysLog("failed to update user last_login_at: " + err.Error())
 	}
 }

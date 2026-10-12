@@ -324,6 +324,10 @@ func handleOAuthLogin(c *gin.Context, provider oauth.Provider, oauthUser *oauth.
 	}
 	user, migration, err := findOrCreateOAuthUser(c, provider, oauthUser, token, payload.AffiliateCode)
 	if err != nil {
+		if errors.Is(err, model.ErrAffiliateCodeDisabled) {
+			common.ApiError(c, err)
+			return
+		}
 		if errors.Is(err, model.ErrEmailAlreadyTaken) {
 			common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
 			return
@@ -520,11 +524,12 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 	}
 	user.Role = common.RoleCommonUser
 	user.Status = common.UserStatusEnabled
+	user.RegisterIp = c.ClientIP()
 
 	// Handle affiliate code
-	inviterId := 0
-	if affiliateCode != "" {
-		inviterId, _ = model.GetUserIdByAffCode(affiliateCode)
+	inviterId, err := model.GetInviterIdByAffCodeForRegister(affiliateCode)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	// Use transaction to ensure user creation and OAuth binding are atomic

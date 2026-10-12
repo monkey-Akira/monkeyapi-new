@@ -28,6 +28,7 @@ import {
   ShieldAlert,
   Link2,
   CreditCard,
+  UserRound,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -49,7 +50,12 @@ import {
 import { UserSubscriptionsDialog } from '@/features/subscriptions/components/dialogs/user-subscriptions-dialog'
 import { handleServerError } from '@/lib/handle-server-error'
 
-import { manageUser, resetUserPasskey, resetUserTwoFA } from '../api'
+import {
+  manageUser,
+  resetUserPasskey,
+  resetUserTwoFA,
+  setUserAffCodeDisabled,
+} from '../api'
 import {
   USER_STATUS,
   USER_ROLE,
@@ -59,6 +65,7 @@ import {
 import { getUserActionMessage } from '../lib'
 import type { User, ManageUserAction } from '../types'
 import { UserBindingDialog } from './dialogs/user-binding-dialog'
+import { UserInviteesDialog } from './user-invitees-dialog'
 import { useUsers } from './users-provider'
 
 interface DataTableRowActionsProps {
@@ -73,6 +80,7 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
   const [resetTwoFAOpen, setResetTwoFAOpen] = useState(false)
   const [bindingDialogOpen, setBindingDialogOpen] = useState(false)
   const [subscriptionsDialogOpen, setSubscriptionsDialogOpen] = useState(false)
+  const [affCodeDialogOpen, setAffCodeDialogOpen] = useState(false)
 
   const handleEdit = () => {
     setCurrentRow(user)
@@ -95,6 +103,25 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
       }
     } catch (error) {
       handleServerError(error, t(ERROR_MESSAGES.UNEXPECTED))
+    }
+  }
+
+  const handleToggleAffCode = async () => {
+    try {
+      const result = await setUserAffCodeDisabled(
+        user.id,
+        !user.aff_code_disabled
+      )
+      if (result.success) {
+        toast.success(t(user.aff_code_disabled ? 'Enabled' : 'Disabled'))
+        triggerRefresh()
+      } else {
+        handleServerError(result, t('Operation failed'))
+      }
+    } catch (error) {
+      handleServerError(error, t('Operation failed'))
+    } finally {
+      setAffCodeDialogOpen(false)
     }
   }
 
@@ -221,6 +248,20 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
           </DropdownMenuShortcut>
         </DropdownMenuItem>
 
+        <DropdownMenuItem
+          onSelect={(event) => {
+            event.preventDefault()
+            setAffCodeDialogOpen(true)
+          }}
+          disabled={!user.aff_code}
+        >
+          {t(user.aff_code_disabled ? 'Enable' : 'Disable')}{' '}
+          {t('Invitation Code')}
+          <DropdownMenuShortcut>
+            <UserRound size={16} />
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+
         <DropdownMenuSeparator />
 
         <DropdownMenuItem
@@ -294,6 +335,17 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
         onUnbindSuccess={triggerRefresh}
       />
 
+      <UserInviteesDialog user={user} />
+
+      <ConfirmDialog
+        open={affCodeDialogOpen}
+        onOpenChange={setAffCodeDialogOpen}
+        title={t(user.aff_code_disabled ? 'Confirm enable' : 'Confirm disable')}
+        desc={t(user.aff_code_disabled ? 'Confirm enable' : 'Confirm disable')}
+        confirmText={t(user.aff_code_disabled ? 'Enable' : 'Disable')}
+        destructive={!user.aff_code_disabled}
+        handleConfirm={handleToggleAffCode}
+      />
       <UserSubscriptionsDialog
         open={subscriptionsDialogOpen}
         onOpenChange={setSubscriptionsDialogOpen}

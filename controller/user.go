@@ -197,7 +197,11 @@ func setupLoginAtAuthVersion(user *model.User, expectedAuthVersion int64, c *gin
 
 func writeLoginResponse(c *gin.Context, user *model.User, bundle *service.AuthBundle) {
 	c.Set("login_method", bundle.Session.LoginMethod)
-	model.UpdateUserLastLoginAt(user.Id)
+	clientIP := c.ClientIP()
+	model.UpdateUserLastLoginInfo(user.Id, clientIP)
+	if err := model.RecordUserLoginIp(user.Id, clientIP); err != nil {
+		common.SysLog(fmt.Sprintf("failed to record user login ip for user %d: %v", user.Id, err))
+	}
 	service.WriteRefreshCookie(c, bundle.RefreshToken)
 	setAuthNoStore(c)
 	recordLoginAudit(user, c)
@@ -272,12 +276,17 @@ func Register(c *gin.Context) {
 		return
 	}
 	affCode := user.AffCode // this code is the inviter's code, not the user's own code
-	inviterId, _ := model.GetUserIdByAffCode(affCode)
+	inviterId, err := model.GetInviterIdByAffCodeForRegister(affCode)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	cleanUser := model.User{
 		Username:    user.Username,
 		Password:    user.Password,
 		DisplayName: user.Username,
 		InviterId:   inviterId,
+		RegisterIp:  c.ClientIP(),
 		Role:        common.RoleCommonUser, // 明确设置角色为普通用户
 	}
 	if common.EmailVerificationEnabled {
@@ -350,6 +359,67 @@ func GetAllUsers(c *gin.Context) {
 	return
 }
 
+func GetUserRiskAlerts(c *gin.Context) {
+	pageInfo := common.GetPageQuery(c)
+	alerts, total, err := model.GetUserRiskAlerts(c.Query("status"), pageInfo)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(alerts)
+	common.ApiSuccess(c, pageInfo)
+}
+
+func GetUserRiskAlert(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	alert, users, err := model.GetUserRiskAlertDetail(id)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, gin.H{"alert": alert, "users": users})
+}
+
+type UserRiskAlertStatusRequest struct {
+	Status string `json:"status"`
+}
+
+func UpdateUserRiskAlertStatus(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	var req UserRiskAlertStatusRequest
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if err := model.UpdateUserRiskAlertStatus(id, req.Status); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, nil)
+}
+
+func DisableUserRiskAlertUsers(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	result, err := model.DisableUserRiskAlertUsers(id)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, result)
+}
 func SearchUsers(c *gin.Context) {
 	keyword := c.Query("keyword")
 	group := c.Query("group")
@@ -379,6 +449,86 @@ func SearchUsers(c *gin.Context) {
 	return
 }
 
+type AffCodeDisabledRequest struct {
+	Disabled bool `json:"disabled"`
+}
+
+func GetUserInvitees(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	user, err := model.GetUserById(id, false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if !canManageTargetRole(c.GetInt("role"), user.Role) {
+		common.ApiErrorI18n(c, i18n.MsgUserNoPermissionSameLevel)
+		return
+	}
+	pageInfo := common.GetPageQuery(c)
+	users, total, err := model.GetUsersByInviterId(id, pageInfo)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	pageInfo.SetTotal(int(total))
+	pageInfo.SetItems(users)
+	common.ApiSuccess(c, pageInfo)
+}
+
+func DisableUserInvitees(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	inviter, err := model.GetUserById(id, false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if !canManageTargetRole(c.GetInt("role"), inviter.Role) {
+		common.ApiErrorI18n(c, i18n.MsgUserNoPermissionSameLevel)
+		return
+	}
+	result, err := model.DisableUserInvitees(id, c.GetInt("role"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, result)
+}
+
+func SetUserAffCodeDisabled(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	var req AffCodeDisabledRequest
+	if err := common.DecodeJson(c.Request.Body, &req); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	user, err := model.GetUserById(id, false)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if !canManageTargetRole(c.GetInt("role"), user.Role) {
+		common.ApiErrorI18n(c, i18n.MsgUserNoPermissionSameLevel)
+		return
+	}
+	if err := model.UpdateUserAffCodeDisabled(id, req.Disabled); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	user.AffCodeDisabled = req.Disabled
+	common.ApiSuccess(c, user)
+}
 func canManageTargetRole(myRole int, targetRole int) bool {
 	return myRole == common.RoleRootUser || myRole > targetRole
 }
@@ -993,6 +1143,7 @@ func CreateUser(c *gin.Context) {
 		Username:    user.Username,
 		Password:    user.Password,
 		DisplayName: user.DisplayName,
+		RegisterIp:  c.ClientIP(),
 		Role:        user.Role, // 保持管理员设置的角色
 	}
 	authzTouched := false

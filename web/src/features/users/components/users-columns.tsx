@@ -243,8 +243,14 @@ export function useUsersColumns(): ColumnDef<User>[] {
           const affCount = user.aff_count || 0
           const affHistoryQuota = user.aff_history_quota || 0
           const inviterId = user.inviter_id || 0
+          const affCode = user.aff_code || ''
 
-          if (affCount === 0 && affHistoryQuota === 0 && inviterId === 0) {
+          if (
+            affCount === 0 &&
+            affHistoryQuota === 0 &&
+            inviterId === 0 &&
+            affCode === ''
+          ) {
             return <span className='text-muted-foreground text-sm'>—</span>
           }
 
@@ -253,6 +259,12 @@ export function useUsersColumns(): ColumnDef<User>[] {
               data-table-text='secondary'
               className='min-w-0 space-y-1 text-xs font-normal'
             >
+              {affCode && (
+                <LongText>
+                  {t('Invitation Code')}: {affCode} ·{' '}
+                  {t(user.aff_code_disabled ? 'Disabled' : 'Enabled')}
+                </LongText>
+              )}
               {(affCount > 0 || affHistoryQuota !== 0) && (
                 <LongText>
                   {t('Invited {{count}} users', { count: affCount })} ·{' '}
