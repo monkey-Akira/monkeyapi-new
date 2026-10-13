@@ -6823,6 +6823,15 @@
     "No custom error messages configured.": "未配置自定义错误文案。",
     "Add mapping": "添加映射",
     "Use default mappings": "使用默认映射",
-    "Save error messages": "保存错误文案"
+    "Save error messages": "保存错误文案",
+    "Buy a redemption code, then enter it below to add funds.": "购买兑换码后，在下方输入即可到账。",
+    "Description shown near the wallet redemption code button": "显示在钱包兑换码按钮旁的说明",
+    "Get redemption code now": "立即获取兑换码",
+    "Large image shown above the redemption code link": "显示在兑换码获取按钮上方的大图",
+    "Title shown in the wallet redemption code prompt": "显示在钱包兑换码引导模块里的标题",
+    "Top-up prompt description": "充值引导说明",
+    "Top-up prompt image": "充值引导图片",
+    "Top-up prompt title": "充值引导标题",
+    "https://example.com/topup-banner.jpg": "https://example.com/topup-banner.jpg"
   }
 }

@@ -23,7 +23,6 @@ import type { Resolver } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import * as z from 'zod'
 
-import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Form,
   FormControl,
@@ -35,6 +34,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import { formatQuota } from '@/lib/format'
 
 import { FormDirtyIndicator } from '../components/form-dirty-indicator'
@@ -56,6 +56,9 @@ const quotaSchema = z.object({
   QuotaForInviter: z.coerce.number().min(0),
   QuotaForInvitee: z.coerce.number().min(0),
   TopUpLink: z.string(),
+  TopUpLinkImage: z.string(),
+  TopUpLinkTitle: z.string(),
+  TopUpLinkDescription: z.string(),
   quota_setting: z.object({
     enable_free_model_pre_consume: z.boolean(),
     trust_quota_usd: z.preprocess(
@@ -81,12 +84,10 @@ function formatQuotaInputValue(value: QuotaInputValue): string {
 
 type QuotaSettingsSectionProps = {
   defaultValues: QuotaFormValues
-  complianceConfirmed?: boolean
 }
 
 export function QuotaSettingsSection({
   defaultValues,
-  complianceConfirmed = true,
 }: QuotaSettingsSectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
@@ -118,16 +119,6 @@ export function QuotaSettingsSection({
   return (
     <SettingsSection title={t('Quota Settings')}>
       <FormNavigationGuard when={isDirty} />
-
-      {!complianceConfirmed ? (
-        <Alert variant='destructive'>
-          <AlertDescription>
-            {t(
-              'Non-zero invitation rewards require compliance confirmation in Payment Gateway settings.'
-            )}
-          </AlertDescription>
-        </Alert>
-      ) : null}
 
       <Form {...form}>
         <SettingsForm onSubmit={handleSubmit}>
@@ -309,7 +300,7 @@ export function QuotaSettingsSection({
               control={form.control}
               name='TopUpLink'
               render={({ field }) => (
-                <FormItem>
+                <FormItem className='sm:col-span-2'>
                   <FormLabel>{t('Top-Up Link')}</FormLabel>
                   <FormControl>
                     <Input
@@ -324,6 +315,72 @@ export function QuotaSettingsSection({
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name='TopUpLinkImage'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Top-up prompt image')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t('https://example.com/topup-banner.jpg')}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t('Large image shown above the redemption code link')}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name='TopUpLinkTitle'
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('Top-up prompt title')}</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder={t('Need a redemption code?')}
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    {t('Title shown in the wallet redemption code prompt')}
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <SettingsFormGridItem span='full'>
+              <FormField
+                control={form.control}
+                name='TopUpLinkDescription'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{t('Top-up prompt description')}</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder={t(
+                          'Buy a redemption code, then enter it below to add funds.'
+                        )}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {t(
+                        'Description shown near the wallet redemption code button'
+                      )}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </SettingsFormGridItem>
           </SettingsFormGrid>
         </SettingsForm>
       </Form>
