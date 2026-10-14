@@ -34,6 +34,17 @@ const i18nKeys = {
   'Dynamic Pricing': 'Dynamic Pricing',
   'Matched Tier': 'Matched Tier',
   'Group Ratio': 'Group Ratio',
+  'Billing Process': 'Billing Process',
+  Input: 'Input',
+  Output: 'Output',
+  'Cache Read': 'Cache Read',
+  'Cache Creation (5m)': 'Cache Creation (5m)',
+  'Image input': 'Image input',
+  'Audio input': 'Audio input',
+  'Web Search': 'Web Search',
+  times: 'times',
+  'Raw billing formula is for reference only; actual billing prevails.':
+    'Raw billing formula is for reference only; actual billing prevails.',
   'Total Cost': 'Total Cost',
   'Usage parameters': 'Usage parameters',
 }
@@ -64,7 +75,11 @@ function makeLog(other: LogOtherData): UsageLog {
   }
 }
 
-function renderDetails(other: LogOtherData, promptTokens = 0): QueryClient {
+function renderDetails(
+  other: LogOtherData,
+  promptTokens = 0,
+  completionTokens = 0
+): QueryClient {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -79,7 +94,11 @@ function renderDetails(other: LogOtherData, promptTokens = 0): QueryClient {
   render(
     <QueryClientProvider client={queryClient}>
       <DetailsDialog
-        log={{ ...makeLog(other), prompt_tokens: promptTokens }}
+        log={{
+          ...makeLog(other),
+          prompt_tokens: promptTokens,
+          completion_tokens: completionTokens,
+        }}
         isAdmin={false}
         isRoot={false}
         open
@@ -174,6 +193,40 @@ describe('usage facts billing details', () => {
       queryClient.clear()
     }
     queryClients.length = 0
+  })
+
+  test('shows the raw billing formula for ratio usage and tool surcharges', () => {
+    const queryClient = renderDetails(
+      {
+        model_ratio: 1,
+        completion_ratio: 3,
+        group_ratio: 1.5,
+        cache_tokens: 100,
+        cache_creation_tokens_5m: 50,
+        cache_creation_ratio_5m: 1.5,
+        image: true,
+        image_ratio: 1.2,
+        image_output: 20,
+        audio_input_seperate_price: true,
+        audio_input_token_count: 30,
+        audio_input_price: 5,
+        tool_surcharges: [{ name: 'web_search', count: 2, price: 10 }],
+      },
+      1000,
+      100
+    )
+    const process = rowValue('Billing Process')
+    expect(process).toContain('Input 800 tokens / 1M tokens')
+    expect(process).toContain('Cache Read 100 tokens / 1M tokens')
+    expect(process).toContain('Cache Creation (5m) 50 tokens / 1M tokens')
+    expect(process).toContain('Image input 20 tokens / 1M tokens')
+    expect(process).toContain('Audio input 30 tokens / 1M tokens')
+    expect(process).toContain('Output 100 tokens / 1M tokens')
+    expect(process).toContain('Web Search 2 times / 1000 times')
+    expect(process).toContain(
+      'Raw billing formula is for reference only; actual billing prevails.'
+    )
+    queryClient.clear()
   })
 
   test('renders one raw-key row per usage fact before total cost', () => {
