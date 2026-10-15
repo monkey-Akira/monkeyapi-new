@@ -6792,6 +6792,8 @@
     "No custom error messages configured.": "Пользовательские сообщения не настроены.",
     "Add mapping": "Добавить правило",
     "Use default mappings": "Использовать правила по умолчанию",
-    "Save error messages": "Сохранить сообщения об ошибках"
+    "Save error messages": "Сохранить сообщения об ошибках",
+    "Restore the standard cursor": "Восстановить стандартный курсор",
+    "Use the banana cursor": "Использовать банановый курсор"
   }
 }

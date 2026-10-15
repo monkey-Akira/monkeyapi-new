@@ -6824,6 +6824,8 @@
     "No custom error messages configured.": "尚未設定自訂錯誤訊息。",
     "Add mapping": "新增對映",
     "Use default mappings": "使用預設對映",
-    "Save error messages": "儲存錯誤訊息"
+    "Save error messages": "儲存錯誤訊息",
+    "Restore the standard cursor": "恢復標準滑鼠",
+    "Use the banana cursor": "使用香蕉滑鼠"
   }
 }

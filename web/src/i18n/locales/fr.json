@@ -6792,6 +6792,8 @@
     "No custom error messages configured.": "Aucun message erreur personnalisé configuré.",
     "Add mapping": "Ajouter une correspondance",
     "Use default mappings": "Utiliser les correspondances par défaut",
-    "Save error messages": "Enregistrer les messages erreur"
+    "Save error messages": "Enregistrer les messages erreur",
+    "Restore the standard cursor": "Rétablir le curseur standard",
+    "Use the banana cursor": "Utiliser le curseur banane"
   }
 }

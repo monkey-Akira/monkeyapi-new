@@ -6833,6 +6833,8 @@
     "Top-up prompt description": "Top-up prompt description",
     "Top-up prompt image": "Top-up prompt image",
     "Top-up prompt title": "Top-up prompt title",
-    "https://example.com/topup-banner.jpg": "https://example.com/topup-banner.jpg"
+    "https://example.com/topup-banner.jpg": "https://example.com/topup-banner.jpg",
+    "Restore the standard cursor": "Restore the standard cursor",
+    "Use the banana cursor": "Use the banana cursor"
   }
 }

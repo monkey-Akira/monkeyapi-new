@@ -6833,6 +6833,8 @@
     "Top-up prompt description": "充值引导说明",
     "Top-up prompt image": "充值引导图片",
     "Top-up prompt title": "充值引导标题",
-    "https://example.com/topup-banner.jpg": "https://example.com/topup-banner.jpg"
+    "https://example.com/topup-banner.jpg": "https://example.com/topup-banner.jpg",
+    "Restore the standard cursor": "恢复标准鼠标",
+    "Use the banana cursor": "使用香蕉鼠标"
   }
 }

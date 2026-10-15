@@ -6792,6 +6792,8 @@
     "No custom error messages configured.": "Chưa cấu hình thông báo lỗi tùy chỉnh.",
     "Add mapping": "Thêm ánh xạ",
     "Use default mappings": "Dùng ánh xạ mặc định",
-    "Save error messages": "Lưu thông báo lỗi"
+    "Save error messages": "Lưu thông báo lỗi",
+    "Restore the standard cursor": "Khôi phục con trỏ chuẩn",
+    "Use the banana cursor": "Sử dụng con trỏ chuối"
   }
 }

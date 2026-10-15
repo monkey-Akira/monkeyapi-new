@@ -138,6 +138,89 @@ For commercial licensing, please contact support@quantumnous.com
   }
 }
 
+@media (hover: hover) and (pointer: fine) {
+  html[data-cursor-style='banana'] body,
+  html[data-cursor-style='banana'] body * {
+    cursor: url('/banana-cursor.svg') 6 2, auto;
+  }
+
+  html[data-cursor-style='banana'] input,
+  html[data-cursor-style='banana'] textarea,
+  html[data-cursor-style='banana'] select,
+  html[data-cursor-style='banana'] [contenteditable='true'] {
+    cursor: text;
+  }
+
+  html[data-cursor-style='banana'] body [data-cursor='default'] {
+    cursor: auto;
+  }
+
+  html[data-cursor-style='banana'] [data-cursor='text'],
+  html[data-cursor-style='banana'] .cursor-text {
+    cursor: text;
+  }
+
+  html[data-cursor-style='banana'] body button:not(:disabled),
+  html[data-cursor-style='banana'] body [role='button']:not(:disabled) {
+    cursor: url('/banana-cursor.svg') 6 2, auto;
+  }
+
+  html[data-cursor-style='banana'] body .cursor-grab {
+    cursor: grab;
+  }
+
+  html[data-cursor-style='banana'] body .cursor-grabbing {
+    cursor: grabbing;
+  }
+
+  html[data-cursor-style='banana'] body .cursor-copy {
+    cursor: copy;
+  }
+
+  html[data-cursor-style='banana'] body .cursor-help {
+    cursor: help;
+  }
+
+  html[data-cursor-style='banana'] body .cursor-not-allowed {
+    cursor: not-allowed;
+  }
+
+  html[data-cursor-style='banana'] body .cursor-e-resize {
+    cursor: e-resize;
+  }
+
+  html[data-cursor-style='banana'] body .cursor-w-resize {
+    cursor: w-resize;
+  }
+
+  html[data-cursor-style='banana'] body .cursor-move {
+    cursor: move;
+  }
+
+  html[data-cursor-style='banana'] body .cursor-col-resize {
+    cursor: col-resize;
+  }
+
+  html[data-cursor-style='banana'] body .cursor-row-resize {
+    cursor: row-resize;
+  }
+
+  html[data-cursor-style='banana'] body .cursor-ew-resize {
+    cursor: ew-resize;
+  }
+
+  html[data-cursor-style='banana'] body .cursor-ns-resize {
+    cursor: ns-resize;
+  }
+
+  html[data-cursor-style='banana'] body .cursor-nesw-resize {
+    cursor: nesw-resize;
+  }
+
+  html[data-cursor-style='banana'] body .cursor-nwse-resize {
+    cursor: nwse-resize;
+  }
+}
 /* Vercel Geist-style skeleton shimmer */
 .skeleton-shimmer {
   background: linear-gradient(

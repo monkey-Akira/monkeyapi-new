@@ -6792,6 +6792,8 @@
     "No custom error messages configured.": "カスタムエラーメッセージは未設定です。",
     "Add mapping": "マッピングを追加",
     "Use default mappings": "既定のマッピングを使用",
-    "Save error messages": "エラーメッセージを保存"
+    "Save error messages": "エラーメッセージを保存",
+    "Restore the standard cursor": "標準カーソルに戻す",
+    "Use the banana cursor": "バナナカーソルを使う"
   }
 }
