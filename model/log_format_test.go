@@ -1,12 +1,17 @@
 package model
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/QuantumNous/new-api/common"
 
+	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/driver/sqlite"
+	"gorm.io/gorm"
 )
 
 // TestFormatUserLogsStripsQuotaSaturation verifies the admin-only quota
@@ -241,4 +246,45 @@ func TestLogFormattingPreservesLargeIntegerLexemes(t *testing.T) {
 		FormatAdminLogs(adminLogs)
 		assert.Equal(t, unprivileged, adminLogs[0].Other)
 	})
+}
+
+func TestUsageAndErrorLogsAlwaysRecordClientIP(t *testing.T) {
+	logDB, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, logDB.AutoMigrate(&Log{}))
+
+	previousLogDB := LOG_DB
+	previousLogConsumeEnabled := common.LogConsumeEnabled
+	previousDataExportEnabled := common.DataExportEnabled
+	LOG_DB = logDB
+	common.LogConsumeEnabled = true
+	common.DataExportEnabled = false
+	t.Cleanup(func() {
+		LOG_DB = previousLogDB
+		common.LogConsumeEnabled = previousLogConsumeEnabled
+		common.DataExportEnabled = previousDataExportEnabled
+	})
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	ctx.Request.RemoteAddr = "203.0.113.10:12345"
+	ctx.Set("username", "alice")
+
+	RecordConsumeLog(ctx, 1, RecordConsumeLogParams{
+		ModelName: "test-model",
+		TokenName: "test-token",
+		TokenId:   11,
+		Other:     NewLogOther(),
+	})
+	RecordErrorLog(ctx, 1, 2, "test-model", "test-token", "upstream error", 11, 1, false, "default", NewLogOther())
+
+	var logs []Log
+	require.NoError(t, logDB.Order("id asc").Find(&logs).Error)
+	require.Len(t, logs, 2)
+	assert.Equal(t, LogTypeConsume, logs[0].Type)
+	assert.Equal(t, LogTypeError, logs[1].Type)
+	for _, log := range logs {
+		assert.Equal(t, "203.0.113.10", log.Ip)
+	}
 }
