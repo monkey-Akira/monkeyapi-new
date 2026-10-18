@@ -2,6 +2,7 @@ import { Ban } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import bananaCursorUrl from '@/assets/banana-cursor.svg'
 import { Button } from '@/components/ui/button'
 import {
   Tooltip,
@@ -57,7 +58,7 @@ export function BananaCursorToggle() {
           }
         >
           <img
-            src='/banana-cursor.svg'
+            src={bananaCursorUrl}
             alt=''
             aria-hidden='true'
             className='size-6'
